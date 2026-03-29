@@ -477,6 +477,12 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
             <button class="eye-btn" type="button" onclick="togglePw(this)">&#x1f441;</button>
           </div>
         </div>
+        <div class="form-group">
+          <label>트레이딩 계정 주소<span class="en">Trading Account (선택)</span></label>
+          <div class="input-wrap">
+            <input type="text" id="decibel_subaccount" placeholder="0x... (비워두면 자동 탐색)">
+          </div>
+        </div>
       </div>
 
       <div class="security-notice">
@@ -724,6 +730,9 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
       }
       body[fields[i]] = el.value.trim();
     }
+    // Optional subaccount
+    var sub = document.getElementById('decibel_subaccount').value.trim();
+    if (sub) body.decibel_subaccount = sub;
 
     var btn = document.getElementById('btn-save-creds');
     btn.disabled = true;

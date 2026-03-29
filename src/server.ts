@@ -89,6 +89,9 @@ app.post('/api/credentials', async (req: Request, res: Response) => {
     vault.set('standx_evm_key', standx_evm_key);
     vault.set('decibel_wallet_key', decibel_wallet_key);
     vault.set('decibel_bearer', decibel_bearer);
+    if (req.body.decibel_subaccount) {
+      vault.set('decibel_subaccount', req.body.decibel_subaccount);
+    }
 
     // Try to connect both clients
     standxClient = new StandXClient();
