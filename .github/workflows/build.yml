@@ -21,7 +21,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build
-      - run: npx electron-builder --win --${{ matrix.arch }}
+      - run: npx electron-builder --win --${{ matrix.arch }} --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: win-${{ matrix.arch }}
@@ -34,9 +34,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
+      - run: npm ci --retry 3
       - run: npm run build
-      - run: npx electron-builder --mac --x64 --arm64
+      - run: npx electron-builder --mac --x64 --arm64 --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: mac
@@ -51,7 +51,7 @@ jobs:
           node-version: 20
       - run: npm ci
       - run: npm run build
-      - run: npx electron-builder --linux --x64
+      - run: npx electron-builder --linux --x64 --publish never
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -66,7 +66,7 @@ jobs:
           path: artifacts
           merge-multiple: true
       - name: List artifacts
-        run: find artifacts -type f | head -20
+        run: find artifacts -type f
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
