@@ -1,0 +1,13 @@
+node_modules/
+dist/
+bin/
+*.env
+*.env.*
+config.local.json
+logs/
+*.log
+
+# SECURITY: Never commit private keys or secrets
+*.pem
+*.key
+secrets/

@@ -1,0 +1,54 @@
+{
+  "name": "standx-decibel-hedge",
+  "version": "1.0.0",
+  "description": "StandX × Decibel cross-exchange hedging volume bot",
+  "main": "electron-main.js",
+  "scripts": {
+    "build": "tsc && cp -r src/public dist/",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "electron": "npm run build && electron .",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:all": "npm run build && electron-builder --mac --win --linux"
+  },
+  "dependencies": {
+    "@aptos-labs/ts-sdk": "^1.33.1",
+    "bs58": "^5.0.0",
+    "ethers": "^6.13.0",
+    "express": "^5.2.1",
+    "open": "^8.4.2",
+    "tweetnacl": "^1.0.3",
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^20.14.0",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.10",
+    "electron": "^41.1.0",
+    "electron-builder": "^26.8.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  },
+  "build": {
+    "appId": "com.standx.hedge-bot",
+    "productName": "StandX Hedge Bot",
+    "files": [
+      "dist/**/*",
+      "electron-main.js",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "portable"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}

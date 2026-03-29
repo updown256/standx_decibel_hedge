@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StandX x Decibel Hedge Bot</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg-primary:#f5f7fa;
+  --bg-secondary:#ffffff;
+  --bg-card:#ffffff;
+  --bg-input:#f0f2f5;
+  --text-primary:#1a1a2e;
+  --text-secondary:#4a5568;
+  --text-muted:#9aa0b0;
+  --accent:#2563eb;
+  --accent-light:#3b82f6;
+  --green:#16a34a;
+  --green-dim:#16a34a20;
+  --red:#dc2626;
+  --red-dim:#dc262620;
+  --yellow:#d97706;
+  --yellow-dim:#d9770620;
+  --border:#e2e8f0;
+  --border-light:#cbd5e1;
+  --radius:10px;
+  --mono:'SF Mono','Fira Code','Cascadia Code','Consolas',monospace;
+  --sans:-apple-system,'Segoe UI','Noto Sans KR',sans-serif;
+}
+html{font-size:14px}
+body{
+  font-family:var(--sans);
+  background:var(--bg-primary);
+  color:var(--text-primary);
+  line-height:1.5;
+  min-height:100vh;
+}
+a{color:var(--accent-light);text-decoration:none}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg-primary)}
+::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:3px}
+
+/* Layout */
+.container{max-width:960px;margin:0 auto;padding:16px}
+
+/* Header */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;
+  background:linear-gradient(135deg,#2563eb,#1d4ed8);
+  border-radius:var(--radius);
+  margin-bottom:20px;
+  border:1px solid var(--border);
+  color:#fff;
+}
+.header h1{font-size:1.3rem;font-weight:700;letter-spacing:-0.02em;color:#fff}
+.header h1 span{color:rgba(255,255,255,0.7);font-weight:400;font-size:0.85rem;margin-left:6px}
+.security-badge{
+  display:flex;align-items:center;gap:6px;
+  font-size:0.75rem;color:var(--green);
+  background:var(--green-dim);
+  padding:4px 10px;border-radius:20px;
+  border:1px solid var(--green);
+}
+
+/* Card */
+.card{
+  background:var(--bg-secondary);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  margin-bottom:16px;
+  overflow:hidden;
+}
+.card-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;
+  background:var(--bg-input);
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+  user-select:none;
+}
+.card-header h2{font-size:1rem;font-weight:600;display:flex;align-items:center;gap:8px}
+.card-header .step{
+  font-size:0.7rem;background:var(--accent);
+  padding:2px 8px;border-radius:10px;color:#fff;
+}
+.card-header .toggle-icon{
+  transition:transform 0.2s;font-size:0.8rem;color:var(--text-muted);
+}
+.card-header .toggle-icon.collapsed{transform:rotate(-90deg)}
+.card-body{padding:16px;transition:max-height 0.3s ease}
+.card-body.hidden{display:none}
+
+/* Form */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:0.8rem;color:var(--text-secondary);font-weight:500}
+.form-group label .en{color:var(--text-muted);font-size:0.7rem;margin-left:4px}
+.input-wrap{position:relative;display:flex}
+input,select{
+  width:100%;
+  background:var(--bg-input);
+  border:1px solid var(--border);
+  color:var(--text-primary);
+  padding:8px 12px;
+  border-radius:var(--radius);
+  font-size:0.9rem;
+  font-family:var(--mono);
+  outline:none;
+  transition:border-color 0.2s;
+}
+input:focus,select:focus{border-color:var(--accent-light)}
+input:disabled,select:disabled{opacity:0.5;cursor:not-allowed}
+input[type="number"]{-moz-appearance:textfield}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none}
+select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%234a5568'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.eye-btn{
+  position:absolute;right:1px;top:1px;bottom:1px;
+  background:var(--bg-input);border:none;color:var(--text-muted);
+  padding:0 10px;cursor:pointer;border-radius:0 var(--radius) var(--radius) 0;
+  font-size:0.85rem;
+}
+.eye-btn:hover{color:var(--text-primary)}
+.help-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;border-radius:50%;
+  background:var(--accent);color:#fff;
+  border:none;font-size:0.7rem;font-weight:700;
+  cursor:pointer;margin-left:4px;vertical-align:middle;
+  transition:background 0.2s;
+}
+.help-btn:hover{background:var(--accent-light)}
+
+/* Help modal overlay */
+.modal-overlay{
+  position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;
+  background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;
+  animation:fadeIn 0.2s ease;
+}
+.modal-box{
+  background:#fff;border-radius:12px;max-width:560px;width:92%;
+  box-shadow:0 16px 48px rgba(0,0,0,0.2);overflow:hidden;
+  animation:slideUp 0.25s ease;
+}
+.modal-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 20px;background:var(--bg-input);border-bottom:1px solid var(--border);
+}
+.modal-header h3{font-size:1rem;font-weight:700;color:var(--text-primary)}
+.modal-close{background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text-muted);padding:0 4px}
+.modal-close:hover{color:var(--text-primary)}
+.modal-body{padding:20px;font-size:0.9rem;line-height:1.7;color:var(--text-primary)}
+.modal-body .step-num{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;
+  font-size:0.75rem;font-weight:700;margin-right:8px;flex-shrink:0;
+}
+.modal-body .step-row{display:flex;align-items:flex-start;margin-bottom:12px}
+.modal-body .step-text{flex:1}
+.modal-body a{color:var(--accent);text-decoration:underline}
+.modal-body .highlight{background:var(--yellow-dim);padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:0.85rem}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* Security notice */
+.security-notice{
+  display:flex;align-items:flex-start;gap:8px;
+  padding:10px 14px;
+  background:var(--green-dim);
+  border:1px solid rgba(0,200,83,0.3);
+  border-radius:var(--radius);
+  font-size:0.78rem;color:var(--green);
+  margin-top:12px;
+  line-height:1.4;
+}
+
+/* Toggle switch */
+.toggle-group{display:flex;align-items:center;gap:0}
+.toggle-group .toggle-opt{
+  padding:7px 18px;
+  background:var(--bg-input);
+  border:1px solid var(--border);
+  color:var(--text-secondary);
+  cursor:pointer;
+  font-size:0.85rem;
+  transition:all 0.2s;
+}
+.toggle-group .toggle-opt:first-child{border-radius:var(--radius) 0 0 var(--radius)}
+.toggle-group .toggle-opt:last-child{border-radius:0 var(--radius) var(--radius) 0}
+.toggle-group .toggle-opt.active{
+  background:var(--accent);color:var(--text-primary);
+  border-color:var(--accent-light);
+}
+
+/* Radio group */
+.radio-group{display:flex;gap:16px;align-items:center}
+.radio-group label{
+  display:flex;align-items:center;gap:6px;
+  cursor:pointer;font-size:0.85rem;color:var(--text-secondary);
+}
+.radio-group input[type="radio"]{
+  width:auto;accent-color:var(--accent-light);cursor:pointer;
+}
+.rotation-params{margin-top:8px}
+
+/* Buttons */
+.btn{
+  padding:10px 24px;
+  border:none;border-radius:var(--radius);
+  font-size:0.9rem;font-weight:600;
+  cursor:pointer;
+  transition:all 0.2s;
+  font-family:var(--sans);
+}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.btn-primary{
+  background:linear-gradient(135deg,#2563eb,#1d4ed8);
+  color:#fff;
+  box-shadow:0 2px 8px rgba(37,99,235,0.3);
+}
+.btn-primary:hover:not(:disabled){
+  background:linear-gradient(135deg,#3b82f6,#2563eb);
+  box-shadow:0 4px 16px rgba(37,99,235,0.4);
+  transform:translateY(-1px);
+}
+.btn-success{
+  background:linear-gradient(135deg,#00803a,#00c853);
+  color:#fff;
+}
+.btn-success:hover:not(:disabled){
+  background:linear-gradient(135deg,#00c853,#00e676);
+  transform:translateY(-1px);
+}
+.btn-danger{
+  background:linear-gradient(135deg,#b71c1c,#ff1744);
+  color:#fff;
+}
+.btn-danger:hover:not(:disabled){
+  background:linear-gradient(135deg,#ff1744,#ff5252);
+  transform:translateY(-1px);
+}
+.btn-row{display:flex;gap:10px;margin-top:14px;justify-content:flex-end}
+
+/* Status dot */
+.status-indicator{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:6px 14px;border-radius:20px;
+  font-size:0.85rem;font-weight:600;
+}
+.status-indicator .dot{
+  width:10px;height:10px;border-radius:50%;
+  display:inline-block;
+}
+.status-stopped{background:var(--bg-input);border:1px solid var(--border)}
+.status-stopped .dot{background:var(--text-muted)}
+.status-running{background:var(--green-dim);border:1px solid var(--green);color:var(--green)}
+.status-running .dot{background:var(--green);animation:pulse 1.5s infinite}
+.status-error{background:var(--red-dim);border:1px solid var(--red);color:var(--red)}
+.status-error .dot{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* Dashboard grid */
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dash-item{
+  background:var(--bg-input);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:12px;
+}
+.dash-item .label{font-size:0.75rem;color:var(--text-muted);margin-bottom:4px}
+.dash-item .value{font-size:1.1rem;font-family:var(--mono);font-weight:600}
+.dash-item .sub{font-size:0.75rem;color:var(--text-secondary);margin-top:2px;font-family:var(--mono)}
+
+/* Stats table */
+.stats-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:0.85rem}
+.stats-table th{
+  text-align:left;padding:8px 10px;
+  color:var(--text-muted);font-weight:500;
+  border-bottom:1px solid var(--border);
+  font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em;
+}
+.stats-table td{
+  padding:8px 10px;
+  border-bottom:1px solid rgba(30,45,74,0.5);
+  font-family:var(--mono);
+}
+.stats-table tr:last-child td{border-bottom:none;font-weight:600}
+.positive{color:var(--green)}
+.negative{color:var(--red)}
+.neutral{color:var(--text-secondary)}
+
+/* Trade log */
+.trade-log{
+  max-height:260px;overflow-y:auto;
+  background:var(--bg-input);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  margin-top:12px;
+  font-family:var(--mono);
+  font-size:0.78rem;
+}
+.trade-log .empty{padding:20px;text-align:center;color:var(--text-muted)}
+.trade-entry{
+  padding:6px 12px;
+  border-bottom:1px solid rgba(30,45,74,0.3);
+  display:flex;gap:10px;align-items:baseline;
+}
+.trade-entry:last-child{border-bottom:none}
+.trade-entry .time{color:var(--text-muted);white-space:nowrap;min-width:70px}
+.trade-entry .exchange{
+  font-size:0.7rem;padding:1px 6px;border-radius:3px;
+  white-space:nowrap;
+}
+.trade-entry .exchange.standx{background:rgba(15,52,96,0.5);color:#5a9fd4}
+.trade-entry .exchange.decibel{background:rgba(100,50,150,0.3);color:#b080e0}
+.trade-entry .detail{color:var(--text-secondary)}
+.trade-entry .buy{color:var(--green)}
+.trade-entry .sell{color:var(--red)}
+
+/* Countdown */
+.countdown{font-family:var(--mono);font-size:1.4rem;font-weight:700;color:var(--yellow)}
+
+/* Responsive */
+@media(max-width:640px){
+  .container{padding:10px}
+  .form-grid{grid-template-columns:1fr}
+  .dash-grid{grid-template-columns:1fr}
+  .header{flex-direction:column;gap:10px;text-align:center}
+  .header h1{font-size:1.1rem}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>StandX x Decibel Hedge Bot<span>v1.0</span></h1>
+    <div class="security-badge"><span>&#x1f512;</span> Local Only</div>
+  </div>
+
+  <!-- Dashboard — always on top -->
+  <div class="card" id="card-dashboard">
+    <div class="card-header" onclick="toggleCard('dashboard')">
+      <h2><span class="step">LIVE</span> 대시보드</h2>
+      <span class="toggle-icon" id="icon-dashboard">▼</span>
+    </div>
+    <div class="card-body" id="body-dashboard">
+
+      <!-- Wallet info — always visible -->
+      <div id="wallet-panel" style="margin-bottom:14px;padding:10px 12px;background:var(--bg-input);border-radius:var(--radius);border:1px solid var(--border);font-family:var(--mono);font-size:0.88rem;">
+        <table style="width:100%;border-collapse:collapse;">
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:6px 4px;color:var(--accent-light);font-weight:600;width:70px">StandX</td>
+            <td style="padding:6px 4px;color:var(--text-muted)" id="wallet-standx-addr">미연결</td>
+            <td style="padding:6px 4px;text-align:right" id="wallet-standx-bal"><span style="color:var(--text-muted)">—</span></td>
+          </tr>
+          <tr>
+            <td style="padding:6px 4px;color:var(--accent-light);font-weight:600">Decibel</td>
+            <td style="padding:6px 4px;color:var(--text-muted)" id="wallet-decibel-addr">미연결</td>
+            <td style="padding:6px 4px;text-align:right" id="wallet-decibel-bal"><span style="color:var(--text-muted)">—</span></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Status row -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+        <div class="status-indicator status-stopped" id="status-badge">
+          <span class="dot"></span>
+          <span id="status-text">Stopped</span>
+        </div>
+        <div>
+          <span style="font-size:0.78rem;color:var(--text-muted)">다음 로테이션</span>
+          <span class="countdown" id="countdown">--:--</span>
+        </div>
+      </div>
+
+      <!-- Positions -->
+      <div class="dash-grid">
+        <div class="dash-item">
+          <div class="label">현재 사이클</div>
+          <div class="value" id="dash-cycle">-</div>
+        </div>
+        <div class="dash-item">
+          <div class="label">StandX 포지션</div>
+          <div class="value" id="dash-standx-pos">-</div>
+          <div class="sub" id="dash-standx-price">-</div>
+        </div>
+        <div class="dash-item">
+          <div class="label">Decibel 포지션</div>
+          <div class="value" id="dash-decibel-pos">-</div>
+          <div class="sub" id="dash-decibel-price">-</div>
+        </div>
+        <div class="dash-item">
+          <div class="label">Net PnL</div>
+          <div class="value" id="dash-pnl">$0.00</div>
+        </div>
+      </div>
+
+      <!-- Stats table -->
+      <table class="stats-table">
+        <thead>
+          <tr><th>거래소</th><th>체결 횟수</th><th>거래량</th><th>수수료</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--text-secondary)">StandX</td>
+            <td id="stat-standx-trades">0</td>
+            <td id="stat-standx-vol">$0.00</td>
+            <td id="stat-standx-fees">$0.00</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-secondary)">Decibel</td>
+            <td id="stat-decibel-trades">0</td>
+            <td id="stat-decibel-vol">$0.00</td>
+            <td id="stat-decibel-fees">$0.00</td>
+          </tr>
+          <tr>
+            <td style="color:var(--text-primary)">합계</td>
+            <td id="stat-total-trades">0</td>
+            <td id="stat-total-vol">$0.00</td>
+            <td id="stat-total-fees">$0.00</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Trade log -->
+      <div style="margin-top:14px">
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:6px">최근 체결 로그 (최대 50건)</div>
+        <div class="trade-log" id="trade-log">
+          <div class="empty">체결 내역이 없습니다</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Section 1: Credentials -->
+  <div class="card" id="card-credentials">
+    <div class="card-header" onclick="toggleCard('credentials')">
+      <h2><span class="step">STEP 1</span> API &#xC790;&#xACA9;&#xC99D;&#xBA85; &#xC124;&#xC815;</h2>
+      <span class="toggle-icon" id="icon-credentials">&#x25BC;</span>
+    </div>
+    <div class="card-body" id="body-credentials">
+      <div class="form-grid">
+        <!-- StandX -->
+        <div class="form-group full" style="margin-bottom:4px">
+          <label style="font-size:0.9rem;font-weight:700;color:var(--text-primary)">StandX</label>
+        </div>
+        <div class="form-group full">
+          <label>EVM &#xD504;&#xB77C;&#xC774;&#xBE57; &#xD0A4;<span class="en">EVM Private Key</span></label>
+          <div class="input-wrap">
+            <input type="password" id="standx_evm_key" placeholder="0x..." required>
+            <button class="eye-btn" type="button" onclick="togglePw(this)">&#x1f441;</button>
+          </div>
+        </div>
+
+        <!-- Decibel -->
+        <div class="form-group full" style="margin-top:8px;margin-bottom:4px">
+          <label style="font-size:0.9rem;font-weight:700;color:var(--text-primary)">Decibel</label>
+        </div>
+        <div class="form-group">
+          <label>API 월렛 프라이빗 키<span class="en">API Wallet Private Key</span> <button class="help-btn" type="button" onclick="showHelp('wallet')">?</button></label>
+          <div class="input-wrap">
+            <input type="password" id="decibel_wallet_key" placeholder="0x..." required>
+            <button class="eye-btn" type="button" onclick="togglePw(this)">&#x1f441;</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Geomi 베어러 토큰<span class="en">Geomi Bearer Token</span> <button class="help-btn" type="button" onclick="showHelp('bearer')">?</button></label>
+          <div class="input-wrap">
+            <input type="password" id="decibel_bearer" placeholder="Bearer token..." required>
+            <button class="eye-btn" type="button" onclick="togglePw(this)">&#x1f441;</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="security-notice">
+        <span style="font-size:1.1rem;flex-shrink:0">&#x1f510;</span>
+        <div>키는 메모리에만 저장됩니다. 디스크에 저장되거나 외부로 전송되지 않습니다.</div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-save-creds" onclick="saveCredentials()">Save &amp; Connect</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Section 2: Trading Config -->
+  <div class="card" id="card-config">
+    <div class="card-header" onclick="toggleCard('config')">
+      <h2><span class="step">STEP 2</span> &#xD2B8;&#xB808;&#xC774;&#xB529; &#xC124;&#xC815;</h2>
+      <span class="toggle-icon" id="icon-config">&#x25BC;</span>
+    </div>
+    <div class="card-body" id="body-config">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>&#xC2EC;&#xBCFC;<span class="en">Symbol</span></label>
+          <select id="cfg-symbol">
+            <option value="BTC">BTC</option>
+            <option value="ETH">ETH</option>
+            <option value="SOL">SOL</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>&#xC8FC;&#xBB38; &#xC218;&#xB7C9;<span class="en">Order Size</span></label>
+          <input type="number" id="cfg-orderSize" placeholder="0.01" step="any" min="0" required>
+        </div>
+        <div class="form-group">
+          <label>&#xB808;&#xBC84;&#xB9AC;&#xC9C0;<span class="en">Leverage (1-40)</span></label>
+          <input type="number" id="cfg-leverage" value="10" min="1" max="40" step="1" required>
+        </div>
+        <div class="form-group">
+          <label>&#xAC00;&#xACA9; &#xD5C8;&#xC6A9;&#xCE58;<span class="en">Price Tolerance ($)</span></label>
+          <input type="number" id="cfg-priceTolerance" value="1" step="any" min="0" required>
+        </div>
+
+        <div class="form-group full">
+          <label>StandX &#xCD08;&#xAE30; &#xBC29;&#xD5A5;<span class="en">Initial Side</span></label>
+          <div class="toggle-group" style="margin-top:4px">
+            <div class="toggle-opt active" id="side-long" onclick="setSide('long')">Long</div>
+            <div class="toggle-opt" id="side-short" onclick="setSide('short')">Short</div>
+          </div>
+        </div>
+
+        <div class="form-group full">
+          <label>&#xB85C;&#xD14C;&#xC774;&#xC158; &#xBAA8;&#xB4DC;<span class="en">Rotation Mode</span></label>
+          <div class="radio-group" style="margin-top:4px">
+            <label><input type="radio" name="rotationMode" value="fixed" checked onchange="updateRotationUI()"> Fixed</label>
+            <label><input type="radio" name="rotationMode" value="random" onchange="updateRotationUI()"> Random</label>
+          </div>
+          <div class="rotation-params" id="rotation-params">
+            <div class="form-grid" id="rotation-fixed">
+              <div class="form-group">
+                <label>&#xAC04;&#xACA9; (&#xCD08;)<span class="en">Interval (sec, min 60)</span></label>
+                <input type="number" id="cfg-fixedInterval" value="120" min="60" step="1">
+              </div>
+            </div>
+            <div class="form-grid" id="rotation-random" style="display:none">
+              <div class="form-group">
+                <label>&#xCD5C;&#xC18C; (&#xCD08;)<span class="en">Min (sec)</span></label>
+                <input type="number" id="cfg-randomMin" value="60" min="60" step="1">
+              </div>
+              <div class="form-group">
+                <label>&#xCD5C;&#xB300; (&#xCD08;)<span class="en">Max (sec)</span></label>
+                <input type="number" id="cfg-randomMax" value="300" min="60" step="1">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-success" id="btn-start" onclick="startBot()" disabled>Start Bot</button>
+        <button class="btn btn-danger" id="btn-stop" onclick="stopBot()" style="display:none">Stop Bot</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  /* ── State ── */
+  var state = {
+    credentialsSaved: false,
+    botRunning: false,
+    initialSide: 'long',
+    pollTimer: null,
+    countdownTimer: null,
+    nextRotationAt: null
+  };
+
+  /* ── Card toggle ── */
+  window.toggleCard = function(name) {
+    var body = document.getElementById('body-' + name);
+    var icon = document.getElementById('icon-' + name);
+    if (body.classList.contains('hidden')) {
+      body.classList.remove('hidden');
+      icon.classList.remove('collapsed');
+    } else {
+      body.classList.add('hidden');
+      icon.classList.add('collapsed');
+    }
+  };
+
+  /* ── Password toggle ── */
+  window.togglePw = function(btn) {
+    var input = btn.parentElement.querySelector('input');
+    if (input.type === 'password') {
+      input.type = 'text';
+      btn.textContent = '\u25CF';
+    } else {
+      input.type = 'password';
+      btn.textContent = '\uD83D\uDC41';
+    }
+  };
+
+  /* ── Side toggle ── */
+  window.setSide = function(side) {
+    state.initialSide = side;
+    document.getElementById('side-long').classList.toggle('active', side === 'long');
+    document.getElementById('side-short').classList.toggle('active', side === 'short');
+  };
+
+  /* ── Rotation UI ── */
+  window.updateRotationUI = function() {
+    var mode = document.querySelector('input[name="rotationMode"]:checked').value;
+    document.getElementById('rotation-fixed').style.display = mode === 'fixed' ? '' : 'none';
+    document.getElementById('rotation-random').style.display = mode === 'random' ? '' : 'none';
+  };
+
+  /* ── Help modal ── */
+  window.showHelp = function(type) {
+    var old = document.querySelector('.modal-overlay');
+    if (old) old.remove();
+
+    var title, body;
+    if (type === 'wallet') {
+      title = 'API Wallet Private Key 발급 방법';
+      body = '<div class="step-row"><span class="step-num">1</span><div class="step-text">'
+        + '<a href="https://app.decibel.trade/api" target="_blank">app.decibel.trade/api</a> 에 접속합니다.'
+        + '</div></div>'
+        + '<div class="step-row"><span class="step-num">2</span><div class="step-text">'
+        + '지갑(MetaMask 등)을 연결하여 <b>로그인</b>합니다.'
+        + '</div></div>'
+        + '<div class="step-row"><span class="step-num">3</span><div class="step-text">'
+        + '<b>"Create API Wallet"</b> 버튼을 클릭합니다.'
+        + '</div></div>'
+        + '<div class="step-row"><span class="step-num">4</span><div class="step-text">'
+        + '화면에 표시되는 <span class="highlight">Private Key</span> 를 복사합니다.'
+        + '<br><span style="color:var(--red);font-size:0.85rem">&#x26A0; 이 키는 한 번만 표시됩니다. 반드시 안전한 곳에 저장하세요.</span>'
+        + '</div></div>'
+        + '<div style="margin-top:12px;padding:12px;background:var(--bg-input);border-radius:var(--radius);font-size:0.83rem;color:var(--text-secondary)">'
+        + '<b>참고:</b> API Wallet은 트레이딩 전용 별도 지갑입니다. 로그인에 사용한 EVM 지갑과 자동으로 연결됩니다. 별도의 연결 작업은 필요 없습니다.'
+        + '</div>';
+    } else if (type === 'bearer') {
+      title = 'Geomi Bearer Token 발급 방법';
+      body = '<div class="step-row"><span class="step-num">1</span><div class="step-text">'
+        + '<a href="https://geomi.dev" target="_blank">geomi.dev</a> 에 접속하여 <b>Google 계정으로 로그인</b>합니다.'
+        + '</div></div>'
+        + '<div class="step-row"><span class="step-num">2</span><div class="step-text">'
+        + '프로젝트가 없으면 새로 생성합니다. (이름은 자유)'
+        + '</div></div>'
+        + '<div class="step-row"><span class="step-num">3</span><div class="step-text">'
+        + '<b>"API Key"</b> 카드를 클릭하여 새 API Key를 추가합니다.'
+        + '</div></div>'
+        + '<div class="step-row"><span class="step-num">4</span><div class="step-text">'
+        + 'API Key 설정:'
+        + '<ul style="margin:6px 0 0 16px;padding:0">'
+        + '<li>Name: 자유 (예: <span class="highlight">hedge-bot</span>)</li>'
+        + '<li>Network: <span class="highlight">Decibel Mainnet</span> 선택 <span style="color:var(--red)">(중요!)</span></li>'
+        + '<li>Client usage: <b>OFF</b></li>'
+        + '</ul>'
+        + '</div></div>'
+        + '<div class="step-row"><span class="step-num">5</span><div class="step-text">'
+        + '<b>"Create New API Key"</b> 클릭 후, API Keys 테이블의 <span class="highlight">Key secret</span> 열에서 복사 아이콘을 클릭합니다.'
+        + '<br>이것이 Bearer Token입니다.'
+        + '</div></div>';
+    }
+
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    overlay.innerHTML = '<div class="modal-box">'
+      + '<div class="modal-header"><h3>' + title + '</h3>'
+      + '<button class="modal-close" onclick="this.closest(\'.modal-overlay\').remove()">&times;</button></div>'
+      + '<div class="modal-body">' + body + '</div></div>';
+    document.body.appendChild(overlay);
+  };
+
+  /* ── Alert popup ── */
+  function showAlert(msg) {
+    // Remove existing
+    var old = document.getElementById('alert-popup');
+    if (old) old.remove();
+
+    var div = document.createElement('div');
+    div.id = 'alert-popup';
+    div.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;'
+      + 'background:#fff;border:1px solid var(--red);border-radius:var(--radius);padding:16px 24px;'
+      + 'box-shadow:0 8px 32px rgba(0,0,0,0.15);max-width:480px;width:90%;font-size:0.95rem;'
+      + 'color:var(--red);font-weight:500;display:flex;align-items:center;gap:10px;';
+    div.innerHTML = '<span style="font-size:1.3rem;flex-shrink:0">&#x26A0;</span>'
+      + '<span>' + msg + '</span>'
+      + '<button onclick="this.parentNode.remove()" style="margin-left:auto;background:none;border:none;'
+      + 'color:var(--text-muted);font-size:1.2rem;cursor:pointer;padding:0 4px">&times;</button>';
+    document.body.appendChild(div);
+
+    setTimeout(function() { if (div.parentNode) div.remove(); }, 8000);
+  }
+
+  /* ── API helpers ── */
+  function apiPost(path, body) {
+    return fetch(path, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    }).then(function(r) { return r.json(); });
+  }
+
+  function apiGet(path) {
+    return fetch(path).then(function(r) { return r.json(); });
+  }
+
+  /* ── Save Credentials ── */
+  window.saveCredentials = function() {
+    var fields = ['standx_evm_key','decibel_wallet_key','decibel_bearer'];
+    var body = {};
+    for (var i = 0; i < fields.length; i++) {
+      var el = document.getElementById(fields[i]);
+      if (!el.value.trim()) {
+        el.focus();
+        el.style.borderColor = 'var(--red)';
+        setTimeout(function(e){ e.style.borderColor = ''; }.bind(null, el), 2000);
+        return;
+      }
+      body[fields[i]] = el.value.trim();
+    }
+
+    var btn = document.getElementById('btn-save-creds');
+    btn.disabled = true;
+    btn.textContent = 'Connecting...';
+
+    apiPost('/api/credentials', body)
+      .then(function(res) {
+        if (res && !res.success) throw new Error(res.error || 'Connection failed');
+        state.credentialsSaved = true;
+        btn.textContent = 'Connected';
+        btn.style.background = 'linear-gradient(135deg,#16a34a,#22c55e)';
+        btn.style.color = '#fff';
+        document.getElementById('btn-start').disabled = false;
+
+        // Update wallet panel in dashboard
+        updateWalletPanel(res.addresses, res.balances);
+
+        // Collapse credentials section
+        setTimeout(function(){
+          toggleCard('credentials');
+        }, 1000);
+      })
+      .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = 'Save & Connect';
+        setStatus('error', 'Connection Failed');
+        showAlert(err.message || String(err));
+      });
+  };
+
+  /* ── Gather config ── */
+  function gatherConfig() {
+    var mode = document.querySelector('input[name="rotationMode"]:checked').value;
+    var cfg = {
+      symbol: document.getElementById('cfg-symbol').value,
+      orderSize: parseFloat(document.getElementById('cfg-orderSize').value) || 0,
+      leverage: parseInt(document.getElementById('cfg-leverage').value) || 10,
+      priceTolerance: parseFloat(document.getElementById('cfg-priceTolerance').value) || 1,
+      initialSide: state.initialSide,
+      rotationMode: mode
+    };
+    if (mode === 'fixed') {
+      cfg.fixedInterval = Math.max(60, parseInt(document.getElementById('cfg-fixedInterval').value) || 120);
+    } else {
+      cfg.randomMin = Math.max(60, parseInt(document.getElementById('cfg-randomMin').value) || 60);
+      cfg.randomMax = Math.max(cfg.randomMin, parseInt(document.getElementById('cfg-randomMax').value) || 300);
+    }
+    return cfg;
+  }
+
+  /* ── Validate config ── */
+  function validateConfig(cfg) {
+    if (!cfg.orderSize || cfg.orderSize <= 0) {
+      document.getElementById('cfg-orderSize').focus();
+      return false;
+    }
+    if (cfg.leverage < 1 || cfg.leverage > 40) {
+      document.getElementById('cfg-leverage').focus();
+      return false;
+    }
+    return true;
+  }
+
+  /* ── Start Bot ── */
+  window.startBot = function() {
+    var cfg = gatherConfig();
+    if (!validateConfig(cfg)) return;
+
+    var btnStart = document.getElementById('btn-start');
+    var btnStop = document.getElementById('btn-stop');
+    btnStart.disabled = true;
+    btnStart.textContent = 'Starting...';
+
+    apiPost('/api/config', cfg)
+      .then(function(cfgRes) {
+        if (cfgRes && !cfgRes.success) throw new Error(cfgRes.error || 'Config failed');
+        return apiPost('/api/start', {});
+      })
+      .then(function(res) {
+        if (res && !res.success) throw new Error(res.error || 'Start failed');
+        state.botRunning = true;
+        btnStart.style.display = 'none';
+        btnStart.textContent = 'Start Bot';
+        btnStart.disabled = false;
+        btnStop.style.display = '';
+        setConfigDisabled(true);
+        setStatus('running', 'Running');
+        startPolling();
+      })
+      .catch(function(err) {
+        btnStart.disabled = false;
+        btnStart.textContent = 'Start Bot';
+        setStatus('error', 'Start Failed');
+        showAlert(err.message || String(err));
+      });
+  };
+
+  /* ── Stop Bot ── */
+  window.stopBot = function() {
+    var btnStart = document.getElementById('btn-start');
+    var btnStop = document.getElementById('btn-stop');
+    btnStop.disabled = true;
+    btnStop.textContent = 'Stopping...';
+
+    apiPost('/api/stop', {})
+      .then(function() {
+        state.botRunning = false;
+        btnStop.style.display = 'none';
+        btnStop.textContent = 'Stop Bot';
+        btnStop.disabled = false;
+        btnStart.style.display = '';
+        setConfigDisabled(false);
+        setStatus('stopped', 'Stopped');
+        stopPolling();
+        document.getElementById('countdown').textContent = '--:--';
+      })
+      .catch(function(err) {
+        btnStop.disabled = false;
+        btnStop.textContent = 'Stop Bot';
+        console.error('Stop error:', err);
+      });
+  };
+
+  /* ── Disable config while running ── */
+  function setConfigDisabled(disabled) {
+    var body = document.getElementById('body-config');
+    var inputs = body.querySelectorAll('input, select');
+    for (var i = 0; i < inputs.length; i++) {
+      inputs[i].disabled = disabled;
+    }
+    var toggles = body.querySelectorAll('.toggle-opt');
+    for (var j = 0; j < toggles.length; j++) {
+      toggles[j].style.pointerEvents = disabled ? 'none' : '';
+      toggles[j].style.opacity = disabled ? '0.5' : '';
+    }
+  }
+
+  /* ── Status badge ── */
+  function setStatus(type, text) {
+    var badge = document.getElementById('status-badge');
+    badge.className = 'status-indicator status-' + type;
+    document.getElementById('status-text').textContent = text;
+  }
+
+  /* ── Polling ── */
+  function startPolling() {
+    stopPolling();
+    pollStatus();
+    state.pollTimer = setInterval(pollStatus, 2000);
+  }
+
+  function stopPolling() {
+    if (state.pollTimer) {
+      clearInterval(state.pollTimer);
+      state.pollTimer = null;
+    }
+    if (state.countdownTimer) {
+      clearInterval(state.countdownTimer);
+      state.countdownTimer = null;
+    }
+  }
+
+  function shortAddr(a) { return a && a.length > 16 ? a.slice(0,8) + '...' + a.slice(-6) : (a || '—'); }
+
+  function updateWalletPanel(addresses, balances) {
+    var sAddr = addresses ? addresses.standx : '—';
+    var dAddr = addresses ? addresses.decibel : '—';
+    var sAvail = balances && balances.standx ? parseFloat(balances.standx.available||0).toFixed(2) : '0.00';
+    var sEquity = balances && balances.standx ? parseFloat(balances.standx.equity||0).toFixed(2) : '0.00';
+    var dAvail = balances && balances.decibel ? parseFloat(balances.decibel.available||0).toFixed(2) : '0.00';
+    var dEquity = balances && balances.decibel ? parseFloat(balances.decibel.equity||0).toFixed(2) : '0.00';
+
+    document.getElementById('wallet-standx-addr').textContent = shortAddr(sAddr);
+    document.getElementById('wallet-standx-bal').innerHTML = '<span style="color:var(--green)">$' + sAvail + '</span> <span style="color:var(--text-muted);font-size:0.8rem">avail</span> / <span>$' + sEquity + '</span> <span style="color:var(--text-muted);font-size:0.8rem">equity</span>';
+    document.getElementById('wallet-decibel-addr').textContent = shortAddr(dAddr);
+    document.getElementById('wallet-decibel-bal').innerHTML = '<span style="color:var(--green)">$' + dAvail + '</span> <span style="color:var(--text-muted);font-size:0.8rem">avail</span> / <span>$' + dEquity + '</span> <span style="color:var(--text-muted);font-size:0.8rem">equity</span>';
+
+    // Store for polling refresh
+    state.lastAddresses = addresses;
+  }
+
+  function pollStatus() {
+    apiGet('/api/status')
+      .then(function(data) {
+        updateDashboard(data);
+      })
+      .catch(function(err) {
+        console.error('Poll error:', err);
+      });
+  }
+
+  /* ── Update Dashboard ── */
+  function updateDashboard(data) {
+    // Status
+    if (data.running === false && state.botRunning) {
+      state.botRunning = false;
+      setStatus('stopped', 'Stopped');
+      stopPolling();
+      document.getElementById('btn-stop').style.display = 'none';
+      document.getElementById('btn-start').style.display = '';
+      setConfigDisabled(false);
+      return;
+    }
+
+    // Cycle
+    document.getElementById('dash-cycle').textContent = data.cycle != null ? '#' + data.cycle : '-';
+
+    // Positions
+    if (data.positions) {
+      var sx = data.positions.standx;
+      var db = data.positions.decibel;
+      if (sx) {
+        document.getElementById('dash-standx-pos').textContent = sx.side ? sx.side.toUpperCase() : '-';
+        document.getElementById('dash-standx-pos').className = 'value ' + (sx.side === 'long' ? 'positive' : sx.side === 'short' ? 'negative' : '');
+        document.getElementById('dash-standx-price').textContent = sx.price ? '$' + fmtNum(sx.price) : '-';
+      }
+      if (db) {
+        document.getElementById('dash-decibel-pos').textContent = db.side ? db.side.toUpperCase() : '-';
+        document.getElementById('dash-decibel-pos').className = 'value ' + (db.side === 'long' ? 'positive' : db.side === 'short' ? 'negative' : '');
+        document.getElementById('dash-decibel-price').textContent = db.price ? '$' + fmtNum(db.price) : '-';
+      }
+    }
+
+    // Summary stats
+    if (data.summary) {
+      var s = data.summary;
+      document.getElementById('stat-standx-trades').textContent = s.standx_trades || 0;
+      document.getElementById('stat-standx-vol').textContent = '$' + fmtNum(s.standx_volume || 0);
+      document.getElementById('stat-standx-fees').textContent = '$' + fmtNum(s.standx_fees || 0);
+      document.getElementById('stat-decibel-trades').textContent = s.decibel_trades || 0;
+      document.getElementById('stat-decibel-vol').textContent = '$' + fmtNum(s.decibel_volume || 0);
+      document.getElementById('stat-decibel-fees').textContent = '$' + fmtNum(s.decibel_fees || 0);
+      document.getElementById('stat-total-trades').textContent = (s.standx_trades || 0) + (s.decibel_trades || 0);
+      document.getElementById('stat-total-vol').textContent = '$' + fmtNum((s.standx_volume || 0) + (s.decibel_volume || 0));
+      document.getElementById('stat-total-fees').textContent = '$' + fmtNum((s.standx_fees || 0) + (s.decibel_fees || 0));
+
+      var pnl = s.net_pnl || 0;
+      var pnlEl = document.getElementById('dash-pnl');
+      pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + fmtNum(pnl);
+      pnlEl.className = 'value ' + (pnl > 0 ? 'positive' : pnl < 0 ? 'negative' : 'neutral');
+    }
+
+    // Countdown
+    if (data.nextRotation) {
+      state.nextRotationAt = data.nextRotation;
+      startCountdown();
+    }
+
+    // Recent trades
+    if (data.recentTrades && data.recentTrades.length > 0) {
+      renderTrades(data.recentTrades);
+    }
+  }
+
+  /* ── Countdown timer ── */
+  function startCountdown() {
+    if (state.countdownTimer) clearInterval(state.countdownTimer);
+    updateCountdown();
+    state.countdownTimer = setInterval(updateCountdown, 1000);
+  }
+
+  function updateCountdown() {
+    if (!state.nextRotationAt) {
+      document.getElementById('countdown').textContent = '--:--';
+      return;
+    }
+    var now = Date.now();
+    var target = state.nextRotationAt;
+    var diff = Math.max(0, Math.floor((target - now) / 1000));
+    var min = Math.floor(diff / 60);
+    var sec = diff % 60;
+    document.getElementById('countdown').textContent =
+      String(min).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+    if (diff <= 0) {
+      document.getElementById('countdown').textContent = '00:00';
+    }
+  }
+
+  /* ── Render trades ── */
+  function renderTrades(trades) {
+    var log = document.getElementById('trade-log');
+    var html = '';
+    var max = Math.min(trades.length, 50);
+    for (var i = 0; i < max; i++) {
+      var t = trades[i];
+      var ts = t.time ? new Date(t.time).toLocaleTimeString('ko-KR', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
+      var exClass = (t.exchange || '').toLowerCase();
+      var sideClass = t.side === 'buy' ? 'buy' : 'sell';
+      html += '<div class="trade-entry">' +
+        '<span class="time">' + ts + '</span>' +
+        '<span class="exchange ' + exClass + '">' + (t.exchange || '') + '</span>' +
+        '<span class="' + sideClass + '">' + (t.side || '').toUpperCase() + '</span>' +
+        '<span class="detail">' + (t.symbol || '') + ' ' + (t.qty || '') + ' @ $' + fmtNum(t.price || 0) + '</span>' +
+        '</div>';
+    }
+    log.innerHTML = html || '<div class="empty">&#xCCB4;&#xACB0; &#xB0B4;&#xC5ED;&#xC774; &#xC5C6;&#xC2B5;&#xB2C8;&#xB2E4;</div>';
+  }
+
+  /* ── Format number ── */
+  function fmtNum(n) {
+    if (n == null || isNaN(n)) return '0.00';
+    var num = parseFloat(n);
+    if (Math.abs(num) >= 1000) return num.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    return num.toFixed(2);
+  }
+
+})();
+</script>
+</body>
+</html>
