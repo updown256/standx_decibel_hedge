@@ -25,7 +25,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: win-${{ matrix.arch }}
-          path: dist/*.exe
+          path: release/*.exe
 
   build-mac:
     runs-on: macos-latest
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: mac
-          path: dist/*.dmg
+          path: release/*.dmg
 
   build-linux:
     runs-on: ubuntu-latest
@@ -55,7 +55,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux
-          path: dist/*.AppImage
+          path: release/*.AppImage
 
   release:
     needs: [build-windows, build-mac, build-linux]

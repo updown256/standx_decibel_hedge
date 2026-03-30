@@ -2,12 +2,12 @@ const { app, BrowserWindow } = require('electron');
 const { startServer } = require('./dist/server');
 
 let mainWindow = null;
-const PORT = 3847;
+let serverPort = 3847;
 
-function createWindow() {
+function createWindow(port) {
   mainWindow = new BrowserWindow({
-    width: 1000,
-    height: 750,
+    width: 1050,
+    height: 800,
     minWidth: 800,
     minHeight: 600,
     title: 'StandX × Decibel Hedge Bot',
@@ -15,12 +15,13 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: true,
     },
     autoHideMenuBar: true,
     show: false,
   });
 
-  mainWindow.loadURL(`http://localhost:${PORT}`);
+  mainWindow.loadURL(`http://localhost:${port}`);
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -31,11 +32,14 @@ function createWindow() {
   });
 }
 
-process.env.ELECTRON_APP = '1';
-
 app.whenReady().then(async () => {
-  await startServer();
-  createWindow();
+  try {
+    serverPort = await startServer();
+    createWindow(serverPort);
+  } catch (err) {
+    console.error('Server start failed:', err);
+    app.quit();
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -43,5 +47,5 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  if (mainWindow === null) createWindow();
+  if (mainWindow === null) createWindow(serverPort);
 });

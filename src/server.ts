@@ -63,12 +63,10 @@ const app = express();
 
 app.use(express.json());
 
-// Static files: try compiled dist/public first, fallback to src/public for dev
+// Static files: dist/public (cpx copies src/public → dist/public at build time)
 const distPublic = path.join(__dirname, 'public');
-const srcPublic = path.join(__dirname, '..', 'src', 'public');
 
 app.use(express.static(distPublic));
-app.use(express.static(srcPublic));
 
 // ── API Endpoints ─────────────────────────────────────────
 
@@ -334,26 +332,25 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 // ── Server start ──────────────────────────────────────────
 
-export async function startServer(): Promise<void> {
+export async function startServer(): Promise<number> {
   const port = DEFAULT_PORT;
 
-  const server = app.listen(port);
+  const actualPort: number = await new Promise<number>((resolve, reject) => {
+    const server = app.listen(port, '127.0.0.1');
 
-  await new Promise<void>((resolve, reject) => {
     server.on('listening', () => {
       safeLog.info(`[Server] Hedge Bot GUI running at http://localhost:${port}`);
-      resolve();
+      resolve(port);
     });
 
     server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
         safeLog.warn(`[Server] Port ${port} in use, trying ${port + 1}...`);
         server.close();
-        const altServer = app.listen(port + 1);
+        const altServer = app.listen(port + 1, '127.0.0.1');
         altServer.on('listening', () => {
           safeLog.info(`[Server] Hedge Bot GUI running at http://localhost:${port + 1}`);
-          openBrowser(port + 1);
-          resolve();
+          resolve(port + 1);
         });
         altServer.on('error', (altErr: NodeJS.ErrnoException) => {
           reject(new Error(`Cannot bind to port ${port} or ${port + 1}: ${altErr.message}`));
@@ -363,11 +360,6 @@ export async function startServer(): Promise<void> {
       reject(err);
     });
   });
-
-  // Open browser (skip if running inside Electron)
-  if (!process.env.ELECTRON_APP) {
-    openBrowser(port);
-  }
 
   // Graceful shutdown
   const shutdown = async () => {
@@ -383,39 +375,8 @@ export async function startServer(): Promise<void> {
     process.exit(0);
   };
 
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-}
+  process.once('SIGINT', shutdown);
+  process.once('SIGTERM', shutdown);
 
-function openBrowser(port: number): void {
-  const url = `http://localhost:${port}`;
-  const { exec } = require('child_process');
-  const platform = process.platform;
-
-  // Try to open in app mode (no address bar, looks like native window)
-  if (platform === 'win32') {
-    // Windows: Edge is always installed
-    exec(`start msedge --app="${url}"`, (err: any) => {
-      if (err) {
-        // Fallback: try Chrome, then default browser
-        exec(`start chrome --app="${url}"`, (err2: any) => {
-          if (err2) exec(`start "" "${url}"`);
-        });
-      }
-    });
-  } else if (platform === 'darwin') {
-    // macOS: try Chrome app mode, fallback to default
-    exec(`open -a "Google Chrome" --args --app="${url}"`, (err: any) => {
-      if (err) {
-        exec(`open -a "Microsoft Edge" --args --app="${url}"`, (err2: any) => {
-          if (err2) exec(`open "${url}"`);
-        });
-      }
-    });
-  } else {
-    // Linux: try chrome/chromium app mode
-    exec(`google-chrome --app="${url}" 2>/dev/null || chromium --app="${url}" 2>/dev/null || xdg-open "${url}"`);
-  }
-
-  safeLog.info(`[Server] Opening app window: ${url}`);
+  return actualPort;
 }

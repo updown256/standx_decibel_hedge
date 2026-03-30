@@ -5,9 +5,9 @@
   "main": "electron-main.js",
   "scripts": {
     "build": "tsc && cpx \"src/public/**/*\" dist/public",
-    "start": "node dist/index.js",
+    "start": "npm run build && electron .",
+    "start:cli": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "electron": "npm run build && electron .",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && electron-builder --win",
     "dist:linux": "npm run build && electron-builder --linux",
@@ -18,8 +18,7 @@
     "bs58": "^5.0.0",
     "ethers": "^6.13.0",
     "express": "^5.2.1",
-    "open": "^8.4.2",
-    "tweetnacl": "^1.0.3",
+"tweetnacl": "^1.0.3",
     "uuid": "^10.0.0",
     "ws": "^8.18.0"
   },
@@ -37,16 +36,21 @@
   "build": {
     "appId": "com.standx.hedge-bot",
     "productName": "StandX Hedge Bot",
+    "directories": {
+      "output": "release"
+    },
+    "asar": true,
     "files": [
       "dist/**/*",
-      "electron-main.js",
-      "node_modules/**/*"
+      "electron-main.js"
     ],
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "icon": "build/icon.icns"
     },
     "win": {
-      "target": "portable"
+      "target": "portable",
+      "icon": "build/icon.ico"
     },
     "linux": {
       "target": "AppImage"
