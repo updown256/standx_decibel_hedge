@@ -60,8 +60,8 @@ class HedgeBotGUI:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("StandX \u00d7 Decibel Hedge Bot")
-        self.root.geometry("1050x800")
-        self.root.minsize(850, 650)
+        self.root.geometry("1100x1000")
+        self.root.minsize(900, 800)
         self.root.configure(bg=C_BG)
 
         self._server_proc: subprocess.Popen | None = None
@@ -170,6 +170,17 @@ class HedgeBotGUI:
         cred_frame = ttk.LabelFrame(scroll_frame, text="인증 정보", padding=10)
         cred_frame.pack(fill=tk.X, padx=8, pady=(4, 8))
 
+        # ? 도움말 버튼
+        help_frame = ttk.Frame(cred_frame)
+        help_frame.pack(fill=tk.X)
+        help_btn = tk.Button(
+            help_frame, text=" ? ", font=("Helvetica", 11, "bold"),
+            bg="#2563eb", fg="white", relief="flat", bd=0, padx=6, pady=1,
+            cursor="hand2", command=self._show_credential_help,
+        )
+        help_btn.pack(side=tk.RIGHT)
+        ttk.Label(help_frame, text="인증 키 발급 방법", style="StatusKey.TLabel").pack(side=tk.RIGHT, padx=(0, 4))
+
         self._ent_standx_key = self._add_field(cred_frame, "StandX EVM 개인키", show="*")
         self._ent_decibel_key = self._add_field(cred_frame, "Decibel 지갑 키", show="*")
         self._ent_decibel_bearer = self._add_field(cred_frame, "Decibel Bearer Token", show="*")
@@ -190,6 +201,17 @@ class HedgeBotGUI:
         config_frame = ttk.LabelFrame(scroll_frame, text="트레이딩 설정", padding=10)
         config_frame.pack(fill=tk.X, padx=8, pady=(0, 8))
 
+        # ? 도움말 버튼
+        config_help_frame = ttk.Frame(config_frame)
+        config_help_frame.pack(fill=tk.X)
+        config_help_btn = tk.Button(
+            config_help_frame, text=" ? ", font=("Helvetica", 11, "bold"),
+            bg="#2563eb", fg="white", relief="flat", bd=0, padx=6, pady=1,
+            cursor="hand2", command=self._show_config_help,
+        )
+        config_help_btn.pack(side=tk.RIGHT)
+        ttk.Label(config_help_frame, text="설정 설명", style="StatusKey.TLabel").pack(side=tk.RIGHT, padx=(0, 4))
+
         self._ent_symbol = self._add_field(config_frame, "심볼", default="BTC")
         self._ent_order_size = self._add_field(config_frame, "주문 크기 (BTC)", default="0.001")
         self._ent_leverage = self._add_field(config_frame, "레버리지 (1-40)", default="10")
@@ -202,7 +224,7 @@ class HedgeBotGUI:
         self._cmb_rotation.set("fixed")
         self._cmb_rotation.pack(fill=tk.X, pady=(0, 4))
 
-        self._ent_rotation_ms = self._add_field(config_frame, "로테이션 간격 (ms)", default="120000")
+        self._ent_rotation_sec = self._add_field(config_frame, "로테이션 간격 (초)", default="120")
 
         # Initial long exchange
         exch_label = ttk.Label(config_frame, text="초기 롱 거래소")
@@ -231,14 +253,267 @@ class HedgeBotGUI:
         self._btn_stop.pack(side=tk.RIGHT, expand=True, fill=tk.X, padx=(4, 0))
 
     def _add_field(self, parent: tk.Widget, label_text: str, default: str = "", show: str = "") -> ttk.Entry:
-        """라벨 + Entry 한 줄 추가. Entry 위젯을 리턴."""
+        """라벨 + Entry 한 줄 추가. Entry 위젯을 리턴. 클립보드 바인딩 자동 적용."""
         lbl = ttk.Label(parent, text=label_text)
         lbl.pack(anchor="w", pady=(6, 2))
         ent = ttk.Entry(parent, show=show) if show else ttk.Entry(parent)
         if default:
             ent.insert(0, default)
         ent.pack(fill=tk.X, pady=(0, 2))
+        self._bind_clipboard(ent)
         return ent
+
+    # ── Clipboard ────────────────────────────────────────────
+
+    def _bind_clipboard(self, widget: ttk.Entry):
+        """Entry 위젯에 Cmd+V/C/X/A + 우클릭 메뉴 바인딩."""
+        # Cmd+V (macOS), Ctrl+V (Windows/Linux) — 모든 조합 바인딩
+        for mod in ("<Command-v>", "<Control-v>", "<Meta-v>"):
+            widget.bind(mod, self._do_paste)
+        for mod in ("<Command-c>", "<Control-c>", "<Meta-c>"):
+            widget.bind(mod, self._do_copy)
+        for mod in ("<Command-x>", "<Control-x>", "<Meta-x>"):
+            widget.bind(mod, self._do_cut)
+        for mod in ("<Command-a>", "<Control-a>", "<Meta-a>"):
+            widget.bind(mod, self._do_select_all)
+        # 우클릭: macOS Button-2 + Button-3 + Control-Button-1
+        for btn in ("<Button-2>", "<Button-3>", "<Control-Button-1>"):
+            widget.bind(btn, self._show_context_menu)
+
+    def _do_paste(self, event):
+        w = event.widget
+        try:
+            text = self.root.clipboard_get()
+        except tk.TclError:
+            return "break"
+        try:
+            w.delete("sel.first", "sel.last")
+        except tk.TclError:
+            pass
+        w.insert("insert", text)
+        return "break"
+
+    def _do_copy(self, event):
+        w = event.widget
+        try:
+            text = w.selection_get()
+            self.root.clipboard_clear()
+            self.root.clipboard_append(text)
+        except tk.TclError:
+            pass
+        return "break"
+
+    def _do_cut(self, event):
+        self._do_copy(event)
+        try:
+            event.widget.delete("sel.first", "sel.last")
+        except tk.TclError:
+            pass
+        return "break"
+
+    def _do_select_all(self, event):
+        event.widget.select_range(0, tk.END)
+        event.widget.icursor(tk.END)
+        return "break"
+
+    def _show_context_menu(self, event):
+        w = event.widget
+        menu = tk.Menu(self.root, tearoff=0)
+        menu.add_command(label="붙여넣기", command=lambda: self._do_paste(type("E", (), {"widget": w})()))
+        menu.add_command(label="복사", command=lambda: self._do_copy(type("E", (), {"widget": w})()))
+        menu.add_command(label="잘라내기", command=lambda: self._do_cut(type("E", (), {"widget": w})()))
+        menu.add_separator()
+        menu.add_command(label="전체 선택", command=lambda: (w.select_range(0, tk.END), w.icursor(tk.END)))
+        menu.tk_popup(event.x_root, event.y_root)
+
+    # ── Credential Help ──────────────────────────────────────
+
+    def _show_credential_help(self):
+        """인증 키 발급 방법 안내 팝업."""
+        import webbrowser
+        win = tk.Toplevel(self.root)
+        win.title("인증 키 발급 방법")
+        win.geometry("640x600")
+        win.configure(bg="white")
+        win.transient(self.root)
+        win.grab_set()
+
+        # 스크롤 가능 Text
+        frame = ttk.Frame(win)
+        frame.pack(fill=tk.BOTH, expand=True)
+        scrollbar = tk.Scrollbar(frame, orient=tk.VERTICAL)
+        txt = tk.Text(frame, wrap=tk.WORD, font=("Helvetica", 12), bg="white",
+                      fg="#1a1a2e", padx=16, pady=16, relief="flat", spacing2=4,
+                      yscrollcommand=scrollbar.set)
+        scrollbar.configure(command=txt.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        txt.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # 링크 스타일
+        txt.tag_configure("link", foreground="#2563eb", underline=True)
+        txt.tag_bind("link_geomi", "<Button-1>", lambda e: webbrowser.open("https://geomi.dev"))
+        txt.tag_bind("link_geomi", "<Enter>", lambda e: txt.configure(cursor="hand2"))
+        txt.tag_bind("link_geomi", "<Leave>", lambda e: txt.configure(cursor=""))
+        txt.tag_bind("link_geomi_docs", "<Button-1>", lambda e: webbrowser.open("https://geomi.dev/docs/api-keys"))
+        txt.tag_bind("link_geomi_docs", "<Enter>", lambda e: txt.configure(cursor="hand2"))
+        txt.tag_bind("link_geomi_docs", "<Leave>", lambda e: txt.configure(cursor=""))
+        txt.tag_bind("link_petra", "<Button-1>", lambda e: webbrowser.open("https://petra.app"))
+        txt.tag_bind("link_petra", "<Enter>", lambda e: txt.configure(cursor="hand2"))
+        txt.tag_bind("link_petra", "<Leave>", lambda e: txt.configure(cursor=""))
+        txt.tag_bind("link_decibel_api", "<Button-1>", lambda e: webbrowser.open("https://app.decibel.trade/api"))
+        txt.tag_bind("link_decibel_api", "<Enter>", lambda e: txt.configure(cursor="hand2"))
+        txt.tag_bind("link_decibel_api", "<Leave>", lambda e: txt.configure(cursor=""))
+
+        def _insert(text, *tags):
+            txt.insert(tk.END, text, tags)
+
+        _insert("인증 키 발급 방법\n\n")
+
+        _insert("1. StandX EVM 개인키\n\n")
+        _insert("""  MetaMask 또는 EVM 호환 지갑의 개인키입니다.
+
+  발급 방법:
+  1) MetaMask 브라우저 확장 열기
+  2) 상단 계정 아이콘 클릭
+  3) "계정 세부정보" 선택
+  4) "개인키 내보내기" 클릭
+  5) MetaMask 비밀번호 입력 후 확인
+  6) 표시된 개인키 복사 (0x... 형태)
+
+  참고:
+  - 0x 접두사 포함/미포함 모두 가능
+  - BSC(BNB Chain) 네트워크에서 사용
+  - StandX 거래에 사용하는 지갑과 동일해야 합니다
+
+""")
+
+        _insert("2. Decibel 지갑 키 (API Wallet)\n\n")
+        _insert("  Decibel API 전용 지갑입니다. Decibel 사이트에서 생성합니다.\n\n")
+        _insert("  생성 페이지: ")
+        _insert("https://app.decibel.trade/api", "link", "link_decibel_api")
+        _insert("""
+
+  발급 방법:
+  1) 위 링크 클릭하여 Decibel API 페이지 접속
+  2) Petra Wallet 연결 또는 "Continue with Google"
+  3) "Create API Wallet" 클릭
+  4) Private Key 즉시 복사 (1회만 표시됨!)
+  5) Wallet Address도 따로 저장
+
+  주의:
+  - Private Key는 생성 시 1번만 표시됩니다
+  - 복사하지 않으면 다시 볼 수 없습니다
+  - 이 지갑에 APT (가스비)가 필요합니다
+
+""")
+
+        _insert("3. Decibel Bearer Token (Geomi 발급)\n\n")
+        _insert("  Decibel API 인증에 필요한 Bearer Token입니다.\n")
+        _insert("  Geomi 사이트: ")
+        _insert("https://geomi.dev", "link", "link_geomi")
+        _insert("""
+
+  발급 방법:
+  1) 위 Geomi 링크 클릭하여 접속
+  2) 가입/로그인
+  3) 프로젝트 생성 또는 기존 프로젝트 선택
+  4) "API Key" 카드 클릭
+  5) 설정:
+     - API Key Name: 예) decibel
+     - Network: "Decibel Devnet" 선택
+     - Client usage: OFF
+  6) "Create New API Key" 클릭
+  7) "Key secret" 열에서 Bearer Token 복사
+
+  상세 문서: """)
+        _insert("https://geomi.dev/docs/api-keys", "link", "link_geomi_docs")
+        _insert("""
+
+  참고:
+  - 키 노출 시 즉시 Geomi에서 삭제 후 재발급
+
+""")
+
+        _insert("4. Decibel Subaccount (선택)\n\n")
+        _insert("""  서브계정을 사용하는 경우에만 입력합니다.
+  메인 계정만 사용하면 비워두세요.
+
+""")
+
+        _insert("보안 안내\n\n")
+        _insert("""  - 개인키는 절대 타인에게 공유하지 마세요
+  - 입력된 키는 외부 서버에 전송되지 않습니다
+  - 모든 통신은 localhost(127.0.0.1) 내부에서만 이루어집니다
+  - 프로그램 종료 시 메모리에서 자동 삭제됩니다
+""")
+
+        txt.configure(state=tk.DISABLED)
+
+        close_btn = ttk.Button(win, text="닫기", command=win.destroy, style="Accent.TButton")
+        close_btn.pack(pady=(0, 12))
+
+    def _show_config_help(self):
+        """트레이딩 설정 안내 팝업."""
+        win = tk.Toplevel(self.root)
+        win.title("트레이딩 설정 설명")
+        win.geometry("600x560")
+        win.configure(bg="white")
+        win.transient(self.root)
+        win.grab_set()
+
+        txt = tk.Text(win, wrap=tk.WORD, font=("Helvetica", 12), bg="white",
+                      fg="#1a1a2e", padx=16, pady=16, relief="flat", spacing2=4)
+        txt.pack(fill=tk.BOTH, expand=True)
+
+        content = """📊 트레이딩 설정 설명
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 심볼
+  거래할 자산. 기본값: BTC
+
+📌 주문 크기 (BTC)
+  한쪽 거래소에 주문할 수량 (BTC 단위)
+  예: 0.001 = 약 $87 (BTC $87,000 기준)
+
+📌 레버리지 (1-40)
+  양쪽 거래소에 동일하게 적용되는 레버리지 배수
+  높을수록 적은 마진으로 큰 포지션, 청산 위험 증가
+
+📌 가격 허용 오차
+  양쪽 거래소 가격 차이 허용 범위 ($)
+  가격차가 이 값을 초과하면 주문을 보류
+  예: 1 = 양쪽 가격 차이 $1 이내에서만 실행
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 로테이션 모드
+  • fixed: 고정 간격으로 롱/숏 방향 전환
+  • random: 최소~최대 범위 내 랜덤 간격으로 전환
+
+📌 로테이션 간격 (초)
+  롱/숏 방향을 바꾸는 주기 (초 단위)
+  예: 120 = 2분마다 방향 전환
+  fixed 모드에서 사용. random은 별도 최소/최대 설정
+
+📌 초기 롱 거래소
+  봇 시작 시 롱 포지션을 잡을 거래소
+  • standx → StandX 롱 + Decibel 숏
+  • decibel → Decibel 롱 + StandX 숏
+  로테이션마다 방향이 반전됨
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 헷징 원리
+  양쪽 거래소에 동시에 롱/숏 진입
+  → 가격 변동 위험 0 (양빵)
+  → 거래량만 발생 → 수수료/리워드 수취
+"""
+        txt.insert("1.0", content)
+        txt.configure(state=tk.DISABLED)
+
+        close_btn = ttk.Button(win, text="닫기", command=win.destroy, style="Accent.TButton")
+        close_btn.pack(pady=(0, 12))
 
     # ── Right Panel ──────────────────────────────────────────
 
@@ -435,7 +710,7 @@ class HedgeBotGUI:
             self._ent_decibel_bearer, self._ent_decibel_sub,
             self._ent_symbol, self._ent_order_size,
             self._ent_leverage, self._ent_tolerance,
-            self._ent_rotation_ms,
+            self._ent_rotation_sec,
         ]
         for w in widgets:
             w.configure(state=state)
@@ -496,12 +771,7 @@ class HedgeBotGUI:
                         self._lbl_decibel_conn.configure(text="연결됨", style="Connected.TLabel")
                         self._lbl_standx_bal.configure(text=f"${s_bal.get('available', '0')} (equity: ${s_bal.get('equity', '0')})")
                         self._lbl_decibel_bal.configure(text=f"${d_bal.get('available', '0')} (equity: ${d_bal.get('equity', '0')})")
-                        self._btn_connect.configure(state="normal")
-                        # 연결 성공 후 키 필드 삭제 (메모리 노출 최소화)
-                        for ent in (self._ent_standx_key, self._ent_decibel_key, self._ent_decibel_bearer):
-                            ent.delete(0, tk.END)
-                            ent.insert(0, "••• 저장됨 •••")
-                            ent.configure(state="disabled")
+                        self._btn_connect.configure(state="normal", text="재연결")
                         self._append_log(f"[GUI] 연결 성공 | StandX: {addresses.get('standx', '')[:10]}... | Decibel: {addresses.get('decibel', '')[:10]}...")
 
                     self.root.after(0, _update)
@@ -527,7 +797,8 @@ class HedgeBotGUI:
             order_size = self._ent_order_size.get().strip()
             leverage = int(self._ent_leverage.get().strip())
             tolerance = float(self._ent_tolerance.get().strip())
-            rotation_ms = int(self._ent_rotation_ms.get().strip())
+            rotation_sec = int(self._ent_rotation_sec.get().strip())
+            rotation_ms = rotation_sec * 1000
 
             payload = {
                 "symbol": self._ent_symbol.get().strip() or "BTC",
