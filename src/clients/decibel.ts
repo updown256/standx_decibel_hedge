@@ -50,6 +50,8 @@ const SYMBOL_MAP: Record<string, string> = {
 // WS reconnect limits
 const WS_MAX_SESSION_MS = 55 * 60 * 1000; // 55 min (server max is 60)
 const WS_HEARTBEAT_INTERVAL_MS = 25_000;
+const WS_RECONNECT_BASE_MS = 5_000;
+const WS_RECONNECT_MAX_MS = 60_000;
 
 // ============================================================
 // Helpers
@@ -91,6 +93,7 @@ export class DecibelClient implements ExchangeClient {
   private wsHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private wsSessionTimer: ReturnType<typeof setTimeout> | null = null;
   private wsReconnecting = false;
+  private wsReconnectAttempt = 0;
 
   // Position cache (updated via WS)
   private positionCache: Map<string, Position> = new Map();
@@ -427,19 +430,26 @@ export class DecibelClient implements ExchangeClient {
 
   private async fetchMarketAddresses(): Promise<void> {
     try {
-      const data = await this.restGet('/api/v1/asset_contexts');
-      const contexts = Array.isArray(data) ? data : (data?.contexts ?? data?.markets ?? []);
+      const data = await this.restGet('/api/v1/markets');
+      const markets = Array.isArray(data) ? data : [];
 
-      for (const ctx of contexts) {
-        const name = ctx.market_name ?? ctx.name ?? ctx.symbol ?? '';
-        const addr = ctx.market_address ?? ctx.address ?? ctx.market_id ?? '';
+      for (const m of markets) {
+        const name = m.market_name ?? '';
+        const addr = m.market_addr ?? '';
         if (name && addr) {
+          // "BTC/USD" → "BTC/USD" 그대로 + "BTC" 축약도 등록
           this.marketAddresses.set(name, addr);
+          const short = name.split('/')[0];
+          if (short && short !== name) {
+            this.marketAddresses.set(short, addr);
+          }
         }
       }
 
       if (this.marketAddresses.size === 0) {
-        safeLog.warn('[Decibel] No market addresses discovered from asset_contexts. Orders will fail until addresses are set manually.');
+        safeLog.warn('[Decibel] No market addresses discovered from /api/v1/markets. Orders will fail.');
+      } else {
+        safeLog.info(`[Decibel] Discovered ${this.marketAddresses.size} market(s): ${[...this.marketAddresses.keys()].join(', ')}`);
       }
     } catch (err: any) {
       safeLog.warn(`[Decibel] Failed to fetch market addresses: ${err?.message ?? err}. Set manually via setMarketAddress().`);
@@ -494,6 +504,7 @@ export class DecibelClient implements ExchangeClient {
 
       this.ws.on('open', () => {
         safeLog.info('[Decibel] WS connected');
+        this.wsReconnectAttempt = 0;
 
         // Subscribe to account channels
         this.wsSend({ method: 'subscribe', topic: `account_positions:${this.subaccountAddress}` });
@@ -528,8 +539,11 @@ export class DecibelClient implements ExchangeClient {
         safeLog.info(`[Decibel] WS closed: ${code} ${reason.toString()}`);
         this.clearWsTimers();
         if (!this.wsReconnecting && this.aptos) {
-          // Unexpected close — reconnect
-          setTimeout(() => this.reconnectWebSocket(), 3000);
+          // Unexpected close — exponential backoff reconnect
+          const delay = Math.min(WS_RECONNECT_BASE_MS * Math.pow(2, this.wsReconnectAttempt), WS_RECONNECT_MAX_MS);
+          this.wsReconnectAttempt++;
+          safeLog.info(`[Decibel] WS reconnect in ${(delay / 1000).toFixed(0)}s (attempt ${this.wsReconnectAttempt})`);
+          setTimeout(() => this.reconnectWebSocket(), delay);
         }
       });
 
