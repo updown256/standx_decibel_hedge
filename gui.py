@@ -339,12 +339,25 @@ class HedgeBotGUI:
     # ── Server Management ────────────────────────────────────
 
     def _start_server(self):
-        """Node.js 백엔드를 subprocess로 시작하고 준비될 때까지 대기."""
+        """백엔드 서버를 subprocess로 시작하고 준비될 때까지 대기."""
         project_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # 1순위: 번들된 server.exe (pkg로 빌드, Node.js 불필요)
+        server_exe = os.path.join(project_dir, "server.exe")
         dist_index = os.path.join(project_dir, "dist", "index.js")
 
-        # 빌드 필요 여부 확인
-        if not os.path.exists(dist_index):
+        if os.path.exists(server_exe):
+            cmd = [server_exe]
+        elif os.path.exists(dist_index):
+            # 2순위: node + dist/index.js (개발 환경)
+            local_node = os.path.join(project_dir, "node.exe")
+            if sys.platform == "win32" and os.path.exists(local_node):
+                node_cmd = local_node
+            else:
+                node_cmd = "node.exe" if sys.platform == "win32" else "node"
+            cmd = [node_cmd, dist_index]
+        else:
+            # 3순위: npm run build 후 재시도
             self.root.after(0, lambda: self._lbl_server.configure(text="빌드 중 (npm run build)..."))
             try:
                 subprocess.run(
@@ -354,36 +367,23 @@ class HedgeBotGUI:
                     capture_output=True,
                     timeout=60,
                 )
-            except subprocess.CalledProcessError as e:
-                stderr = e.stderr.decode("utf-8", errors="replace") if e.stderr else str(e)
-                self.root.after(0, lambda: self._server_error(f"빌드 실패: {stderr}"))
-                return
-            except FileNotFoundError:
-                self.root.after(0, lambda: self._server_error("npm을 찾을 수 없습니다. Node.js가 설치되어 있는지 확인하세요."))
-                return
-            except subprocess.TimeoutExpired:
-                self.root.after(0, lambda: self._server_error("빌드 타임아웃 (60초)."))
+                cmd = ["node.exe" if sys.platform == "win32" else "node", dist_index]
+            except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
+                self.root.after(0, lambda: self._server_error(f"서버를 시작할 수 없습니다.\nserver.exe 또는 Node.js가 필요합니다.\n{e}"))
                 return
 
         # 서버 시작
         self.root.after(0, lambda: self._lbl_server.configure(text="서버 시작 중..."))
-
-        # 번들된 node.exe 우선, 없으면 시스템 node
-        local_node = os.path.join(project_dir, "node.exe")
-        if sys.platform == "win32" and os.path.exists(local_node):
-            node_cmd = local_node
-        else:
-            node_cmd = "node.exe" if sys.platform == "win32" else "node"
         try:
             self._server_proc = subprocess.Popen(
-                [node_cmd, dist_index],
+                cmd,
                 cwd=project_dir,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 env={k: os.environ[k] for k in ("PATH", "HOME", "USERPROFILE", "SYSTEMROOT", "TEMP", "TMP", "NODE_ENV") if k in os.environ},
             )
         except FileNotFoundError:
-            self.root.after(0, lambda: self._server_error("node를 찾을 수 없습니다. Node.js가 설치되어 있는지 확인하세요."))
+            self.root.after(0, lambda: self._server_error("서버 실행 파일을 찾을 수 없습니다."))
             return
 
         # 서버 준비 대기

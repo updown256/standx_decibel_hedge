@@ -21,40 +21,31 @@ jobs:
       - run: npm ci
       - run: npm run build
 
+      # pkg로 Node.js 백엔드 → 단독 EXE (Node.js 설치 불필요)
+      - name: Build server EXE with pkg
+        run: npx @yao-pkg/pkg dist/index.js --target node20-win-x64 --output server.exe --compress GZip
+
       # Python + PyInstaller
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install pyinstaller
 
-      # PyInstaller: gui.py를 단일 EXE로
+      # GUI EXE 빌드
       - name: Build GUI EXE
         run: >
           pyinstaller --noconfirm --onefile --windowed
           --name "StandX_Hedge_Bot"
           gui.py
 
-      # 배포 패키지 구성
-      - name: Prepare release package
+      # 배포 패키지: GUI EXE + server EXE + public/ 만 필요
+      - name: Prepare release
         shell: bash
         run: |
           mkdir -p release/StandX_Hedge_Bot
-          # GUI EXE
           cp dist/StandX_Hedge_Bot.exe release/StandX_Hedge_Bot/
-          # Node.js 백엔드 (dist/ 폴더)
-          cp -r dist/public release/StandX_Hedge_Bot/dist_public || true
-          mkdir -p release/StandX_Hedge_Bot/dist
-          cp dist/*.js dist/*.js.map release/StandX_Hedge_Bot/dist/ 2>/dev/null || true
-          cp -r dist/public release/StandX_Hedge_Bot/dist/public 2>/dev/null || true
-          cp -r dist/clients release/StandX_Hedge_Bot/dist/clients 2>/dev/null || true
-          cp -r dist/core release/StandX_Hedge_Bot/dist/core 2>/dev/null || true
-          cp -r dist/utils release/StandX_Hedge_Bot/dist/utils 2>/dev/null || true
-          # Node.js 런타임
-          cp "$(which node)" release/StandX_Hedge_Bot/node.exe
-          # node_modules (프로덕션만)
-          cp package.json release/StandX_Hedge_Bot/
-          cd release/StandX_Hedge_Bot && npm ci --omit=dev --ignore-scripts 2>/dev/null || npm install --omit=dev --ignore-scripts
-          rm -f package-lock.json
+          cp server.exe release/StandX_Hedge_Bot/
+          cp -r dist/public release/StandX_Hedge_Bot/public 2>/dev/null || true
 
       - name: ZIP package
         shell: bash
