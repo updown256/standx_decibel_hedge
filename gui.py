@@ -340,7 +340,11 @@ class HedgeBotGUI:
 
     def _start_server(self):
         """백엔드 서버를 subprocess로 시작하고 준비될 때까지 대기."""
-        project_dir = os.path.dirname(os.path.abspath(__file__))
+        # PyInstaller --onefile: __file__은 임시 디렉토리, sys.executable이 실제 EXE 위치
+        if getattr(sys, 'frozen', False):
+            project_dir = os.path.dirname(sys.executable)
+        else:
+            project_dir = os.path.dirname(os.path.abspath(__file__))
 
         # 1순위: 번들된 server.exe (pkg로 빌드, Node.js 불필요)
         server_exe = os.path.join(project_dir, "server.exe")
