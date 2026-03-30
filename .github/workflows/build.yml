@@ -11,62 +11,70 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    strategy:
-      matrix:
-        arch: [x64, arm64]
     steps:
       - uses: actions/checkout@v4
+
+      # Node.js 백엔드 빌드
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - run: npm ci
       - run: npm run build
-      - run: npx electron-builder --win --${{ matrix.arch }} --publish never
-      - uses: actions/upload-artifact@v4
-        with:
-          name: win-${{ matrix.arch }}
-          path: release/*.exe
 
-  build-mac:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # Python + PyInstaller
+      - uses: actions/setup-python@v5
         with:
-          node-version: 20
-      - run: npm ci --retry 3
-      - run: npm run build
-      - run: npx electron-builder --mac --x64 --arm64 --publish never
-      - uses: actions/upload-artifact@v4
-        with:
-          name: mac
-          path: release/*.dmg
+          python-version: '3.12'
+      - run: pip install pyinstaller
 
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci
-      - run: npm run build
-      - run: npx electron-builder --linux --x64 --publish never
+      # PyInstaller: gui.py를 단일 EXE로
+      - name: Build GUI EXE
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --name "StandX_Hedge_Bot"
+          gui.py
+
+      # 배포 패키지 구성
+      - name: Prepare release package
+        shell: bash
+        run: |
+          mkdir -p release/StandX_Hedge_Bot
+          # GUI EXE
+          cp dist/StandX_Hedge_Bot.exe release/StandX_Hedge_Bot/
+          # Node.js 백엔드 (dist/ 폴더)
+          cp -r dist/public release/StandX_Hedge_Bot/dist_public || true
+          mkdir -p release/StandX_Hedge_Bot/dist
+          cp dist/*.js dist/*.js.map release/StandX_Hedge_Bot/dist/ 2>/dev/null || true
+          cp -r dist/public release/StandX_Hedge_Bot/dist/public 2>/dev/null || true
+          cp -r dist/clients release/StandX_Hedge_Bot/dist/clients 2>/dev/null || true
+          cp -r dist/core release/StandX_Hedge_Bot/dist/core 2>/dev/null || true
+          cp -r dist/utils release/StandX_Hedge_Bot/dist/utils 2>/dev/null || true
+          # Node.js 런타임
+          cp "$(which node)" release/StandX_Hedge_Bot/node.exe
+          # node_modules (프로덕션만)
+          cp package.json release/StandX_Hedge_Bot/
+          cd release/StandX_Hedge_Bot && npm ci --omit=dev --ignore-scripts 2>/dev/null || npm install --omit=dev --ignore-scripts
+          rm -f package-lock.json
+
+      - name: ZIP package
+        shell: bash
+        run: |
+          cd release
+          7z a -tzip ../StandX_Hedge_Bot_Windows.zip StandX_Hedge_Bot/
+
       - uses: actions/upload-artifact@v4
         with:
-          name: linux
-          path: release/*.AppImage
+          name: win-x64
+          path: StandX_Hedge_Bot_Windows.zip
 
   release:
-    needs: [build-windows, build-mac, build-linux]
+    needs: [build-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
-      - name: List artifacts
-        run: find artifacts -type f
       - uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*

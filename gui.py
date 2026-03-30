@@ -368,7 +368,12 @@ class HedgeBotGUI:
         # 서버 시작
         self.root.after(0, lambda: self._lbl_server.configure(text="서버 시작 중..."))
 
-        node_cmd = "node.exe" if sys.platform == "win32" else "node"
+        # 번들된 node.exe 우선, 없으면 시스템 node
+        local_node = os.path.join(project_dir, "node.exe")
+        if sys.platform == "win32" and os.path.exists(local_node):
+            node_cmd = local_node
+        else:
+            node_cmd = "node.exe" if sys.platform == "win32" else "node"
         try:
             self._server_proc = subprocess.Popen(
                 [node_cmd, dist_index],
