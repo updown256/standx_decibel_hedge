@@ -37,8 +37,8 @@ const SCALE = 10 ** 9;
 
 // Time-in-force (Move u8 enum — Decibel specific)
 // const TIF_GTC = 0;        // Good-til-cancel
-const TIF_POST_ONLY = 1;    // Post-only (maker) — minimizes fees
-// const TIF_IOC = 2;        // Immediate-or-cancel
+// const TIF_POST_ONLY = 1;  // Post-only (maker) — rejected if would match
+const TIF_IOC = 2;           // Immediate-or-cancel — instant fill
 
 // Symbol mapping: internal symbol -> Decibel market name
 const SYMBOL_MAP: Record<string, string> = {
@@ -303,7 +303,7 @@ export class DecibelClient implements ExchangeClient {
           priceU64,                 // u64 price (9 decimals)
           sizeU64,                  // u64 size (9 decimals)
           isBuy,                    // bool
-          TIF_POST_ONLY,            // u8 time_in_force (1 = PostOnly/maker)
+          TIF_IOC,                  // u8 time_in_force (2 = IOC, instant fill)
           reduceOnly,               // bool
           clientOrderId,            // Option<String> client_order_id
           null,                     // Option<u64> stop_price

@@ -181,7 +181,7 @@ export class StandXClient implements ExchangeClient {
       order_type: 'limit',
       qty: params.size,
       price: roundedPrice,
-      time_in_force: 'alo',
+      time_in_force: 'ioc',
       reduce_only: params.reduceOnly ?? false,
       cl_ord_id: clOrdId,
     };
