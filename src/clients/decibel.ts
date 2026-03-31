@@ -160,19 +160,33 @@ export class DecibelClient implements ExchangeClient {
 
   async getPrice(symbol: string): Promise<{ bid: string; ask: string; mid: string }> {
     const marketName = SYMBOL_MAP[symbol] || `${symbol}/USD`;
-    const data = await this.restGet('/api/v1/prices');
+    // 심볼 → 마켓 주소 변환
+    const marketAddr = this.marketAddresses.get(marketName) || this.marketAddresses.get(symbol) || '';
 
-    // data is expected to be an array or object of market prices
-    // Find the entry matching our market
+    // 특정 마켓만 조회 (주소가 있으면 query param 사용)
+    const query = marketAddr ? `?market=${marketAddr}` : '';
+    const data = await this.restGet(`/api/v1/prices${query}`);
+
     let entry: any = null;
     if (Array.isArray(data)) {
-      entry = data.find((p: any) => p.market === marketName || p.symbol === marketName || p.name === marketName);
+      if (marketAddr) {
+        // 주소로 매칭
+        entry = data.find((p: any) => p.market === marketAddr);
+      }
+      if (!entry) {
+        // 이름으로 폴백
+        entry = data.find((p: any) => p.market === marketName || p.symbol === marketName || p.name === marketName);
+      }
+      if (!entry && data.length === 1) {
+        // 단일 결과면 그대로 사용
+        entry = data[0];
+      }
     } else if (data && typeof data === 'object') {
-      entry = data[marketName];
+      entry = data[marketAddr] || data[marketName];
     }
 
     if (!entry) {
-      throw new Error(`[Decibel] Price not found for ${marketName}`);
+      throw new Error(`[Decibel] Price not found for ${marketName} (addr: ${marketAddr?.slice(0, 10)}...)`);
     }
 
     const bid = String(entry.best_bid ?? entry.bid ?? entry.mark_price ?? '0');
