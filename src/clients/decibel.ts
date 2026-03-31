@@ -189,11 +189,21 @@ export class DecibelClient implements ExchangeClient {
       throw new Error(`[Decibel] Price not found for ${marketName} (addr: ${marketAddr?.slice(0, 10)}...)`);
     }
 
-    const bid = String(entry.best_bid ?? entry.bid ?? entry.mark_price ?? '0');
-    const ask = String(entry.best_ask ?? entry.ask ?? entry.mark_price ?? '0');
-    const bidNum = parseFloat(bid);
-    const askNum = parseFloat(ask);
-    const mid = ((bidNum + askNum) / 2).toFixed(2);
+    // API 응답 필드: mark_px, mid_px, oracle_px (bid/ask 없음)
+    const markPx = parseFloat(entry.mark_px ?? entry.mark_price ?? '0');
+    const midPx = parseFloat(entry.mid_px ?? entry.mid_price ?? '0');
+    const oraclePx = parseFloat(entry.oracle_px ?? entry.oracle_price ?? '0');
+    const price = midPx || markPx || oraclePx;
+
+    if (price <= 0) {
+      throw new Error(`[Decibel] Invalid price for ${marketName}: mark=${markPx}, mid=${midPx}, oracle=${oraclePx}`);
+    }
+
+    // bid/ask 없으므로 mid 기준 ±0.01% 스프레드 추정
+    const spread = price * 0.0001;
+    const bid = (price - spread).toFixed(2);
+    const ask = (price + spread).toFixed(2);
+    const mid = price.toFixed(2);
 
     return { bid, ask, mid };
   }

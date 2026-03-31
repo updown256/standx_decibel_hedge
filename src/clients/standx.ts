@@ -132,16 +132,29 @@ export class StandXClient implements ExchangeClient {
     let bid: string;
     let ask: string;
 
-    const bids: Array<{ price: string }> = depthData?.bids ?? depthData?.data?.bids ?? [];
-    const asks: Array<{ price: string }> = depthData?.asks ?? depthData?.data?.asks ?? [];
+    const rawBids = depthData?.data?.bids ?? depthData?.bids ?? [];
+    const rawAsks = depthData?.data?.asks ?? depthData?.asks ?? [];
 
-    if (bids.length > 0 && asks.length > 0) {
-      bid = bids[0].price;
-      ask = asks[0].price;
+    // depth_book bids/asks: [[price, qty], ...] 또는 [{price, qty}, ...]
+    function extractPrice(entry: any): string {
+      if (Array.isArray(entry)) return String(entry[0] ?? '0');
+      return String(entry?.price ?? '0');
+    }
+
+    if (rawBids.length > 0 && rawAsks.length > 0) {
+      bid = extractPrice(rawBids[0]);
+      ask = extractPrice(rawAsks[0]);
     } else {
-      const lastPrice: string = priceData?.last_price ?? priceData?.data?.last_price ?? '0';
+      const lastPrice: string = priceData?.data?.last_price ?? priceData?.last_price ?? '0';
       bid = lastPrice;
       ask = lastPrice;
+    }
+
+    // NaN 방지
+    if (!bid || bid === '0' || isNaN(parseFloat(bid))) {
+      const fallback = priceData?.data?.mark_price ?? priceData?.mark_price ?? priceData?.data?.last_price ?? priceData?.last_price ?? '0';
+      bid = String(fallback);
+      ask = String(fallback);
     }
 
     const midNum = (parseFloat(bid) + parseFloat(ask)) / 2;
