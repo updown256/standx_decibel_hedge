@@ -188,7 +188,7 @@ export class StandXClient implements ExchangeClient {
 
     const res = await this.signedPost('/api/new_order', body);
 
-    if (res?.error || res?.code) {
+    if (res?.error || (res?.code !== undefined && Number(res.code) !== 0)) {
       return {
         success: false,
         orderId: '',
@@ -412,11 +412,19 @@ export class StandXClient implements ExchangeClient {
     const data = msg.data ?? msg;
 
     if (msg.channel === 'depth_book') {
-      const bids = data.bids as Array<{ price: string }> | undefined;
-      const asks = data.asks as Array<{ price: string }> | undefined;
-      if (bids?.length && asks?.length) {
-        const bid = bids[0].price;
-        const ask = asks[0].price;
+      const rawBids = data.bids as Array<any> | undefined;
+      const rawAsks = data.asks as Array<any> | undefined;
+      if (rawBids?.length && rawAsks?.length) {
+        // Extract price from [price, qty] or {price, qty} format
+        const getPrice = (entry: any): number => {
+          if (Array.isArray(entry)) return parseFloat(String(entry[0] ?? '0'));
+          return parseFloat(String(entry?.price ?? '0'));
+        };
+        // Sort bids descending (highest first), asks ascending (lowest first)
+        const sortedBids = [...rawBids].sort((a, b) => getPrice(b) - getPrice(a));
+        const sortedAsks = [...rawAsks].sort((a, b) => getPrice(a) - getPrice(b));
+        const bid = String(getPrice(sortedBids[0]));
+        const ask = String(getPrice(sortedAsks[0]));
         const mid = ((parseFloat(bid) + parseFloat(ask)) / 2).toFixed(2);
         this.cachedPrice = { bid, ask, mid, ts: Date.now() };
       }

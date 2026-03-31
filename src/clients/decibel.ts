@@ -234,8 +234,8 @@ export class DecibelClient implements ExchangeClient {
       side,
       size: Math.abs(sizeRaw).toString(),
       entryPrice: String(pos.entry_price ?? pos.avg_price ?? '0'),
-      unrealizedPnl: String(pos.unrealized_pnl ?? pos.upnl ?? '0'),
-      leverage: Number(pos.leverage ?? 1),
+      unrealizedPnl: String(pos.unrealized_pnl ?? pos.unrealized_funding ?? pos.upnl ?? '0'),
+      leverage: Number(pos.user_leverage ?? pos.leverage ?? 1),
     };
   }
 
@@ -255,8 +255,8 @@ export class DecibelClient implements ExchangeClient {
     }
 
     return {
-      available: String(overview.available_balance ?? overview.free_collateral ?? overview.available ?? overview.usdc_cross_withdrawable_balance ?? '0'),
-      equity: String(overview.equity ?? overview.perp_equity_balance ?? overview.account_value ?? overview.total ?? '0'),
+      available: String(overview.available_balance ?? overview.usdc_cross_withdrawable_balance ?? overview.free_collateral ?? overview.available ?? '0'),
+      equity: String(overview.perp_equity_balance ?? overview.equity ?? overview.account_value ?? overview.total ?? '0'),
     };
   }
 
@@ -591,18 +591,22 @@ export class DecibelClient implements ExchangeClient {
     const topic = msg.topic ?? msg.channel ?? '';
 
     if (topic.startsWith('account_positions:')) {
-      this.updatePositionCache(msg.data ?? msg.payload);
+      // Decibel WS: positions are in msg.positions (array)
+      this.updatePositionCache(msg.positions ?? msg.data ?? msg.payload);
     }
     // order_updates and user_trades are logged but not cached
     if (topic.startsWith('order_updates:')) {
-      const d = msg.data ?? msg.payload;
+      // Decibel WS: order data is in msg.order (object)
+      const d = msg.order ?? msg.data ?? msg.payload;
       if (d) {
         safeLog.info(`[Decibel] WS order update: ${d.status ?? 'unknown'} | id=${d.order_id ?? d.id ?? '?'}`);
       }
     }
     if (topic.startsWith('user_trades:')) {
-      const d = msg.data ?? msg.payload;
-      if (d) {
+      // Decibel WS: trades are in msg.trades (array)
+      const trades = msg.trades ?? msg.data ?? msg.payload;
+      const arr = Array.isArray(trades) ? trades : (trades ? [trades] : []);
+      for (const d of arr) {
         safeLog.info(`[Decibel] WS trade: ${d.side ?? '?'} ${d.size ?? d.qty ?? '?'} @ ${d.price ?? '?'}`);
       }
     }
@@ -624,8 +628,8 @@ export class DecibelClient implements ExchangeClient {
         side,
         size: Math.abs(sizeRaw).toString(),
         entryPrice: String(pos.entry_price ?? pos.avg_price ?? '0'),
-        unrealizedPnl: String(pos.unrealized_pnl ?? pos.upnl ?? '0'),
-        leverage: Number(pos.leverage ?? 1),
+        unrealizedPnl: String(pos.unrealized_pnl ?? pos.unrealized_funding ?? pos.upnl ?? '0'),
+        leverage: Number(pos.user_leverage ?? pos.leverage ?? 1),
       });
     }
   }

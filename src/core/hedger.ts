@@ -109,14 +109,29 @@ export class Hedger {
 
     safeLog.info(`[Price] StandX mid=$${standxPrice.mid} | Decibel mid=$${decibelPrice.mid}`);
 
-    // Step 2: Open hedge — Long on one, Short on the other
-    const longClient = this.getClient(this.state.longExchange);
-    const shortClient = this.getClient(this.state.shortExchange);
+    // Step 1b: Price tolerance check — skip cycle if mid prices diverge too much
     const longPrice = this.state.longExchange === 'standx' ? standxPrice : decibelPrice;
     const shortPrice = this.state.shortExchange === 'standx' ? standxPrice : decibelPrice;
 
-    const longBuyPrice = Math.round(parseFloat(longPrice.ask)).toString();
-    const shortSellPrice = Math.round(parseFloat(shortPrice.bid)).toString();
+    const priceDiff = Math.abs(parseFloat(longPrice.mid) - parseFloat(shortPrice.mid));
+    if (this.config.priceTolerance > 0 && priceDiff > this.config.priceTolerance) {
+      safeLog.warn(`[Hedger] Price diff $${priceDiff.toFixed(2)} > tolerance $${this.config.priceTolerance}. Skipping cycle.`);
+      return;
+    }
+
+    // Step 1c: Validate parsed prices — NaN/0 guard
+    const longBuyPriceNum = parseFloat(longPrice.ask);
+    const shortSellPriceNum = parseFloat(shortPrice.bid);
+    if (isNaN(longBuyPriceNum) || longBuyPriceNum <= 0 || isNaN(shortSellPriceNum) || shortSellPriceNum <= 0) {
+      throw new Error(`Invalid price: long=${longPrice.ask}, short=${shortPrice.bid}`);
+    }
+
+    // Step 2: Open hedge — Long on one, Short on the other
+    const longClient = this.getClient(this.state.longExchange);
+    const shortClient = this.getClient(this.state.shortExchange);
+
+    const longBuyPrice = Math.round(longBuyPriceNum).toString();
+    const shortSellPrice = Math.round(shortSellPriceNum).toString();
 
     safeLog.info(`[Open] ${this.state.longExchange} BUY @ $${longBuyPrice} | ${this.state.shortExchange} SELL @ $${shortSellPrice}`);
 
@@ -215,6 +230,11 @@ export class Hedger {
 
     // Step 4: Close both positions (with retry)
     await this.closeAllPositions();
+
+    // Step 4b: Block next cycle if positions remain open
+    if (this.state.isPositionOpen) {
+      throw new Error('Residual positions remain after close. Blocking next cycle.');
+    }
 
     // Step 5: Swap sides for next cycle
     this.swapSides();
