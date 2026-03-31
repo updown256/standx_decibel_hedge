@@ -50,8 +50,8 @@ const SYMBOL_MAP: Record<string, string> = {
 // WS reconnect limits
 const WS_MAX_SESSION_MS = 55 * 60 * 1000; // 55 min (server max is 60)
 const WS_HEARTBEAT_INTERVAL_MS = 25_000;
-const WS_RECONNECT_BASE_MS = 5_000;
-const WS_RECONNECT_MAX_MS = 60_000;
+const WS_RECONNECT_BASE_MS = 10_000;   // 429 방지: 10초부터 시작
+const WS_RECONNECT_MAX_MS = 120_000;   // 최대 2분
 
 // ============================================================
 // Helpers
@@ -142,8 +142,8 @@ export class DecibelClient implements ExchangeClient {
 
     safeLog.info(`[Decibel] Connected | wallet=${this.walletAddress.slice(0, 10)}... | subaccount=${this.subaccountAddress.slice(0, 10)}... | markets=${this.marketAddresses.size}`);
 
-    // Start WS for real-time position updates
-    this.connectWebSocket();
+    // Start WS after delay (REST 호출 후 rate limit 여유 확보)
+    setTimeout(() => this.connectWebSocket(), 3000);
   }
 
   async disconnect(): Promise<void> {
@@ -563,6 +563,10 @@ export class DecibelClient implements ExchangeClient {
 
       this.ws.on('error', (err: Error) => {
         safeLog.error(`[Decibel] WS error: ${err.message}`);
+        // 429 rate limit — 추가 백오프
+        if (err.message.includes('429')) {
+          this.wsReconnectAttempt = Math.max(this.wsReconnectAttempt, 2);
+        }
       });
 
       this.ws.on('pong', () => {
