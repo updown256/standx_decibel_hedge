@@ -3,6 +3,7 @@
 // ============================================================
 
 import * as path from 'path';
+import * as fs from 'fs';
 import express, { Request, Response, NextFunction } from 'express';
 import { ethers } from 'ethers';
 import { vault, safeLog } from './utils/security';
@@ -28,18 +29,26 @@ const MAX_RECENT_TRADES = 50;
 const DEFAULT_PORT = 3847;
 
 // ── Log capture ───────────────────────────────────────────
-// Override safeLog methods to also capture messages for the GUI
+// Override safeLog methods to capture for GUI + write to file
 
 const originalInfo = safeLog.info.bind(safeLog);
 const originalWarn = safeLog.warn.bind(safeLog);
 const originalError = safeLog.error.bind(safeLog);
 
+// 로그 파일 (EXE 실행 위치 또는 프로젝트 루트)
+const logDir = path.join(process.cwd(), 'logs');
+try { fs.mkdirSync(logDir, { recursive: true }); } catch { /* ok */ }
+const logFile = path.join(logDir, `hedge_${new Date().toISOString().slice(0, 10)}.log`);
+const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+
 function pushLog(level: string, msg: string): void {
   const ts = new Date().toISOString();
-  recentLogs.push(`[${ts}] [${level}] ${msg}`);
+  const line = `[${ts}] [${level}] ${msg}`;
+  recentLogs.push(line);
   if (recentLogs.length > MAX_LOGS) {
     recentLogs = recentLogs.slice(-MAX_LOGS);
   }
+  logStream.write(line + '\n');
 }
 
 safeLog.info = (msg: string, ...args: unknown[]) => {
