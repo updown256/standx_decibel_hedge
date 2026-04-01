@@ -79,7 +79,7 @@ export async function promptConfig(): Promise<HedgeConfig> {
   const leverageStr = (await ask(rl, '  Leverage [5]: ')) || '5';
   const leverage = parseInt(leverageStr, 10);
 
-  const toleranceStr = (await ask(rl, '  Price tolerance in $ [1]: ')) || '1';
+  const toleranceStr = (await ask(rl, '  Price safety limit in % (0=off) [0]: ')) || '0';
   const priceTolerance = parseFloat(toleranceStr);
 
   const initialSide = ((await ask(rl, '  StandX initial side (long/short) [long]: ')) || 'long') as 'long' | 'short';

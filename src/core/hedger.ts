@@ -29,6 +29,7 @@ export class Hedger {
   private tracker: Tracker;
   private state: HedgeState;
   private stopResolve: (() => void) | null = null;
+  private consecutiveSkips = 0;
 
   constructor(
     standx: ExchangeClient,
@@ -107,17 +108,31 @@ export class Hedger {
       this.decibel.getPrice(this.config.symbol),
     ]);
 
-    safeLog.info(`[Price] StandX mid=$${standxPrice.mid} | Decibel mid=$${decibelPrice.mid}`);
-
-    // Step 1b: Price tolerance check — skip cycle if mid prices diverge too much
+    // Step 1b: Price display + safety valve (percentage-based)
     const longPrice = this.state.longExchange === 'standx' ? standxPrice : decibelPrice;
     const shortPrice = this.state.shortExchange === 'standx' ? standxPrice : decibelPrice;
 
-    const priceDiff = Math.abs(parseFloat(longPrice.mid) - parseFloat(shortPrice.mid));
-    if (this.config.priceTolerance > 0 && priceDiff > this.config.priceTolerance) {
-      safeLog.warn(`[Hedger] Price diff $${priceDiff.toFixed(2)} > tolerance $${this.config.priceTolerance}. Skipping cycle.`);
+    const longMid = parseFloat(longPrice.mid);
+    const shortMid = parseFloat(shortPrice.mid);
+    const priceDiff = Math.abs(longMid - shortMid);
+    const avgPrice = (longMid + shortMid) / 2;
+    const diffPercent = avgPrice > 0 ? (priceDiff / avgPrice) * 100 : 0;
+
+    const limitTag = this.config.priceTolerance > 0 ? `limit: ${this.config.priceTolerance}%` : 'limit: OFF';
+    safeLog.info(`[Price] StandX: $${standxPrice.mid} | Decibel: $${decibelPrice.mid} | diff: ${diffPercent.toFixed(3)}% ($${priceDiff.toFixed(2)}) [${limitTag}]`);
+
+    if (this.config.priceTolerance > 0 && diffPercent > this.config.priceTolerance) {
+      this.consecutiveSkips++;
+      safeLog.warn(`[Hedger] Price diff ${diffPercent.toFixed(3)}% > safety limit ${this.config.priceTolerance}%. Skipping. (${this.consecutiveSkips} consecutive)`);
+      if (this.consecutiveSkips >= 5) {
+        safeLog.error(`[Hedger] ${this.consecutiveSkips} consecutive skips! Check price feeds.`);
+      }
+      for (let i = 0; i < 10 && this.state.running; i++) {
+        await sleep(1000);
+      }
       return;
     }
+    this.consecutiveSkips = 0;
 
     // Step 1c: Validate parsed prices — NaN/0 guard
     const longBuyPriceNum = parseFloat(longPrice.ask);
@@ -439,7 +454,7 @@ export class Hedger {
       '║                 HEDGE BOT CONFIG                    ║',
       '╠══════════════════════════════════════════════════════╣',
       `║  Symbol: ${c.symbol.padEnd(10)} │ Size: ${c.orderSize.padEnd(10)} │ Lev: ${c.leverage}x      ║`,
-      `║  Tolerance: $${c.priceTolerance}    │ Wallet: ${c.walletMode.padEnd(10)}              ║`,
+      `║  Safety Limit: ${c.priceTolerance}%   │ Wallet: ${c.walletMode.padEnd(10)}              ║`,
       `║  Rotation: ${c.rotationMode.padEnd(8)} │ ${c.rotationMode === 'fixed' ? `Interval: ${c.rotationIntervalMs / 1000}s` : `Range: ${c.rotationRandomMinMs / 1000}s - ${c.rotationRandomMaxMs / 1000}s`}       ║`,
       `║  Long: ${this.state.longExchange.padEnd(10)} │ Short: ${this.state.shortExchange.padEnd(10)}          ║`,
       '╚══════════════════════════════════════════════════════╝',

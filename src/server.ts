@@ -162,12 +162,16 @@ app.post('/api/config', (req: Request, res: Response) => {
       res.json({ success: false, error: 'rotationIntervalMs must be >= 60000 (1 min)' });
       return;
     }
+    if (config.priceTolerance !== undefined && (config.priceTolerance < 0 || config.priceTolerance > 50)) {
+      res.json({ success: false, error: 'priceTolerance must be 0-50 (%)' });
+      return;
+    }
 
     currentConfig = {
       symbol: config.symbol || 'BTC',
       orderSize: config.orderSize,
       leverage: config.leverage,
-      priceTolerance: config.priceTolerance ?? 1,
+      priceTolerance: config.priceTolerance ?? 5,
       rotationMode: config.rotationMode || 'fixed',
       rotationIntervalMs: config.rotationIntervalMs,
       rotationRandomMinMs: config.rotationRandomMinMs ?? 60000,

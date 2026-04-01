@@ -522,9 +522,20 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
           <input type="number" id="cfg-leverage" value="10" min="1" max="40" step="1" required>
         </div>
         <div class="form-group">
-          <label>&#xAC00;&#xACA9; &#xD5C8;&#xC6A9;&#xCE58;<span class="en">Price Tolerance ($)</span></label>
-          <input type="number" id="cfg-priceTolerance" value="1" step="any" min="0" required>
+          <label>
+            <input type="checkbox" id="cfg-toleranceEnabled"> &#xAC00;&#xACA9; &#xC548;&#xC804; &#xD55C;&#xB3C4;
+            <span class="en">Safety Limit</span>
+          </label>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" id="cfg-priceTolerance" value="5" step="any" min="0" max="50" disabled style="flex:1">
+            <span>%</span>
+          </div>
         </div>
+        <script>
+          document.getElementById('cfg-toleranceEnabled').addEventListener('change', function() {
+            document.getElementById('cfg-priceTolerance').disabled = !this.checked;
+          });
+        </script>
 
         <div class="form-group full">
           <label>StandX &#xCD08;&#xAE30; &#xBC29;&#xD5A5;<span class="en">Initial Side</span></label>
@@ -770,7 +781,7 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
       symbol: document.getElementById('cfg-symbol').value,
       orderSize: parseFloat(document.getElementById('cfg-orderSize').value) || 0,
       leverage: parseInt(document.getElementById('cfg-leverage').value) || 10,
-      priceTolerance: parseFloat(document.getElementById('cfg-priceTolerance').value) || 1,
+      priceTolerance: document.getElementById('cfg-toleranceEnabled').checked ? (parseFloat(document.getElementById('cfg-priceTolerance').value) || 5) : 0,
       initialSide: state.initialSide,
       rotationMode: mode
     };
@@ -867,6 +878,12 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
     for (var j = 0; j < toggles.length; j++) {
       toggles[j].style.pointerEvents = disabled ? 'none' : '';
       toggles[j].style.opacity = disabled ? '0.5' : '';
+    }
+    // Sync tolerance input with checkbox state after re-enable
+    if (!disabled) {
+      var tolChk = document.getElementById('cfg-toleranceEnabled');
+      var tolInput = document.getElementById('cfg-priceTolerance');
+      if (tolChk && tolInput) tolInput.disabled = !tolChk.checked;
     }
   }
 

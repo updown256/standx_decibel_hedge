@@ -215,7 +215,19 @@ class HedgeBotGUI:
         self._ent_symbol = self._add_field(config_frame, "심볼", default="BTC")
         self._ent_order_size = self._add_field(config_frame, "주문 크기 (BTC)", default="0.001")
         self._ent_leverage = self._add_field(config_frame, "레버리지 (1-40)", default="10")
-        self._ent_tolerance = self._add_field(config_frame, "가격 허용 오차", default="1")
+        # Price safety limit with on/off toggle
+        tol_frame = ttk.Frame(config_frame)
+        tol_frame.pack(fill=tk.X, pady=(6, 4))
+        self._var_tol_enabled = tk.BooleanVar(value=False)
+        self._chk_tol = ttk.Checkbutton(
+            tol_frame, text="가격 안전 한도", variable=self._var_tol_enabled,
+            command=self._toggle_tolerance)
+        self._chk_tol.pack(side=tk.LEFT)
+        self._ent_tolerance = ttk.Entry(tol_frame, width=6)
+        self._ent_tolerance.insert(0, "5")
+        self._ent_tolerance.pack(side=tk.LEFT, padx=(6, 0))
+        ttk.Label(tol_frame, text="%").pack(side=tk.LEFT, padx=(2, 0))
+        self._ent_tolerance.configure(state="disabled")
 
         # Rotation mode combobox
         rot_label = ttk.Label(config_frame, text="로테이션 모드")
@@ -725,6 +737,13 @@ class HedgeBotGUI:
 
     # ── Actions ──────────────────────────────────────────────
 
+    def _toggle_tolerance(self):
+        """가격 안전 한도 on/off 전환."""
+        if self._var_tol_enabled.get():
+            self._ent_tolerance.configure(state="normal")
+        else:
+            self._ent_tolerance.configure(state="disabled")
+
     def _toggle_keys(self):
         """개인키 show/hide 전환."""
         self._show_keys = not self._show_keys
@@ -796,7 +815,7 @@ class HedgeBotGUI:
         try:
             order_size = self._ent_order_size.get().strip()
             leverage = int(self._ent_leverage.get().strip())
-            tolerance = float(self._ent_tolerance.get().strip())
+            tolerance = float(self._ent_tolerance.get().strip()) if self._var_tol_enabled.get() else 0
             rotation_sec = int(self._ent_rotation_sec.get().strip())
             rotation_ms = rotation_sec * 1000
 

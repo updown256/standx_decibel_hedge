@@ -7,7 +7,7 @@ export interface HedgeConfig {
   symbol: string;           // e.g. "BTC" — mapped to each exchange's format
   orderSize: string;        // e.g. "0.001" — decimal string
   leverage: number;         // e.g. 5
-  priceTolerance: number;   // $1 tolerance for price matching
+  priceTolerance: number;   // Safety valve %. Skip only if mid price diff exceeds this. 0=disabled. Default 5%.
 
   // Rotation settings
   rotationMode: 'fixed' | 'random';
