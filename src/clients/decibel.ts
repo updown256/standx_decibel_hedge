@@ -36,9 +36,9 @@ const DECIBEL_MODULE = '0x50ead22afd6ffd9769e3b3d6e0e64a2a350d68e8b102c4e72e33d0
 const SCALE = 10 ** 9;
 
 // Time-in-force (Move u8 enum — Decibel specific)
-const TIF_GTC = 0;           // Good-til-cancel — stays in book until matched or cancelled
+// const TIF_GTC = 0;        // Good-til-cancel — stays in book until matched or cancelled
 // const TIF_POST_ONLY = 1;  // Post-only (maker) — rejected if would match
-// const TIF_IOC = 2;        // Immediate-or-cancel — requires existing counterparty (thin book = no fill)
+const TIF_IOC = 2;           // Immediate-or-cancel — used with extreme price = market order
 
 // Symbol mapping: internal symbol -> Decibel market name
 const SYMBOL_MAP: Record<string, string> = {
@@ -199,9 +199,9 @@ export class DecibelClient implements ExchangeClient {
       throw new Error(`[Decibel] Invalid price for ${marketName}: mark=${markPx}, mid=${midPx}, oracle=${oraclePx}`);
     }
 
-    // 온체인 DEX — 실제 오더북 스프레드가 넓음. 3% 추정으로 GTC 체결 보장
-    // (실제 체결은 best bid/ask에서 되므로 3%는 최악 시나리오 가격)
-    const spread = price * 0.03;
+    // bid/ask 없으므로 mid 기준 ±0.01% 스프레드 추정 (표시용)
+    // 실제 체결 가격은 placeOrder에서 시장가 모드로 처리
+    const spread = price * 0.0001;
     const bid = (price - spread).toFixed(2);
     const ask = (price + spread).toFixed(2);
     const mid = price.toFixed(2);
@@ -287,28 +287,32 @@ export class DecibelClient implements ExchangeClient {
     }
 
     const isBuy = params.side === 'buy';
-    const priceU64 = toU64(params.price);
     const sizeU64 = toU64(params.size);
     const reduceOnly = params.reduceOnly ?? false;
     const clientOrderId = makeClientOrderId();
 
-    safeLog.info(`[Decibel] Placing ${params.side} ${params.size} ${marketName} @ ${params.price} | reduce_only=${reduceOnly} | coid=${clientOrderId}`);
+    // Market order mode: IOC + extreme price → fills at best available price
+    // SELL: price=1 (accept any buyer) | BUY: price=2x passed price (accept any seller)
+    const marketPrice = isBuy
+      ? Math.round(parseFloat(params.price) * 2).toString()
+      : '1';
+    const priceU64 = toU64(marketPrice);
+
+    safeLog.info(`[Decibel] Placing ${params.side} ${params.size} ${marketName} @ market (limit=${marketPrice}) | reduce_only=${reduceOnly} | coid=${clientOrderId}`);
 
     try {
       // ABI: dex_accounts_entry::place_order_to_subaccount
-      // params: subaccount, market, price, size, is_buy, tif, is_reduce_only,
-      //         client_order_id?, stop_price?, tp_trigger?, tp_limit?, sl_trigger?, sl_limit?,
-      //         builder_address?, builder_fees?
+      // Market order = IOC + extreme price → immediate fill at best bid/ask
       const txData: InputEntryFunctionData = {
         function: `${this.moduleAddress}::dex_accounts_entry::place_order_to_subaccount`,
         typeArguments: [],
         functionArguments: [
           this.subaccountAddress,   // Object<Subaccount>
           marketAddress,            // Object<PerpMarket>
-          priceU64,                 // u64 price (9 decimals)
+          priceU64,                 // u64 price (extreme = market order)
           sizeU64,                  // u64 size (9 decimals)
           isBuy,                    // bool
-          TIF_GTC,                  // u8 time_in_force (0 = GTC, stays in book until matched)
+          TIF_IOC,                  // u8 time_in_force (2 = IOC, with extreme price = market)
           reduceOnly,               // bool
           clientOrderId,            // Option<String> client_order_id
           null,                     // Option<u64> stop_price
