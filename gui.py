@@ -898,7 +898,7 @@ class HedgeBotGUI:
 
         def _stop():
             try:
-                result = api_call("POST", "/api/stop")
+                result = api_call("POST", "/api/stop", timeout=60)
                 self._polling = False
                 if result.get("success"):
                     self.root.after(0, lambda: (

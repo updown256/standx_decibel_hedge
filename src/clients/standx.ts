@@ -188,6 +188,8 @@ export class StandXClient implements ExchangeClient {
 
     const res = await this.signedPost('/api/new_order', body);
 
+    safeLog.info(`[StandX] new_order response: ${JSON.stringify(res).slice(0, 500)}`);
+
     if (res?.error || (res?.code !== undefined && Number(res.code) !== 0)) {
       return {
         success: false,
@@ -200,19 +202,23 @@ export class StandXClient implements ExchangeClient {
     }
 
     const orderId: string = res?.order_id ?? res?.data?.order_id ?? clOrdId;
-    const makerFee = parseFloat(params.size) * parseFloat(roundedPrice) * 0.0001;
+    const takerFee = parseFloat(params.size) * parseFloat(roundedPrice) * 0.0004;
+
+    safeLog.info(`[StandX] Order submitted | id=${orderId} | cl_ord_id=${clOrdId}`);
 
     return {
       success: true,
       orderId: String(orderId),
       price: roundedPrice,
       size: params.size,
-      fee: makerFee.toFixed(6),
+      fee: takerFee.toFixed(6),
     };
   }
 
   async cancelOrder(orderId: string): Promise<boolean> {
-    const body = { order_id: orderId };
+    // StandX API: order_id expects i64, cl_ord_id accepts string (UUID)
+    const isUuid = orderId.includes('-');
+    const body = isUuid ? { cl_ord_id: orderId } : { order_id: orderId };
     const res = await this.signedPost('/api/cancel_order', body);
 
     if (res?.error || (res?.code && Number(res.code) >= 400)) {
@@ -225,6 +231,8 @@ export class StandXClient implements ExchangeClient {
   async getPosition(symbol: string): Promise<Position | null> {
     const exSym = toExchangeSymbol(symbol);
     const res = await this.authGet('/api/query_positions', { symbol: exSym });
+
+    // Debug: log only when position check matters (fill verification logs separately)
 
     const positions: ApiResponse[] =
       res?.positions ?? res?.data?.positions ?? res?.data ?? [];

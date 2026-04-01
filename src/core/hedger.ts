@@ -379,11 +379,12 @@ export class Hedger {
       await sleep(FILL_CHECK_INTERVAL_MS);
       try {
         const pos = await client.getPosition(symbol);
+        safeLog.info(`[Fill] ${client.name} check ${i + 1}/${FILL_CHECK_MAX_RETRIES}: size=${pos?.size ?? 'null'}`);
         if (pos && parseFloat(pos.size) > 0) {
           return true;
         }
-      } catch {
-        // retry
+      } catch (err: any) {
+        safeLog.warn(`[Fill] ${client.name} check ${i + 1} error: ${err?.message ?? err}`);
       }
     }
     return false;

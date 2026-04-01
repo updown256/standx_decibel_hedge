@@ -215,6 +215,8 @@ export class DecibelClient implements ExchangeClient {
   async getPosition(symbol: string): Promise<Position | null> {
     const data = await this.restGet(`/api/v1/account_positions?account=${this.subaccountAddress}`);
 
+    // Debug: log only when position check matters (fill verification logs separately)
+
     const marketName = SYMBOL_MAP[symbol] || `${symbol}/USD`;
     const positions = Array.isArray(data) ? data : (data?.positions ?? []);
 
