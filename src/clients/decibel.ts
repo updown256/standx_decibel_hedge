@@ -220,6 +220,8 @@ export class DecibelClient implements ExchangeClient {
     const marketName = SYMBOL_MAP[symbol] || `${symbol}/USD`;
     const positions = Array.isArray(data) ? data : (data?.positions ?? []);
 
+    safeLog.info(`[Decibel] getPosition raw (${positions.length} entries): ${JSON.stringify(positions).slice(0, 500)}`);
+
     const pos = positions.find(
       (p: any) => p.market === marketName || p.symbol === marketName || p.market_name === marketName,
     );
