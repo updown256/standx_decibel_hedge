@@ -351,6 +351,19 @@ export class DecibelClient implements ExchangeClient {
         };
       }
 
+      // Log tx events to diagnose order placement
+      const events = (confirmedTx as any).events ?? [];
+      const relevantEvents = events.filter((e: any) => {
+        const t = (e.type ?? '').toLowerCase();
+        return t.includes('order') || t.includes('trade') || t.includes('fill') || t.includes('match') || t.includes('position');
+      });
+      safeLog.info(`[Decibel] tx events (${events.length} total, ${relevantEvents.length} relevant): ${JSON.stringify(relevantEvents).slice(0, 1000)}`);
+      if (relevantEvents.length === 0 && events.length > 0) {
+        // Show all event types for diagnosis
+        const allTypes = events.map((e: any) => e.type ?? 'unknown');
+        safeLog.info(`[Decibel] all event types: ${JSON.stringify(allTypes).slice(0, 500)}`);
+      }
+
       // Estimate fee (gas in APT, not trading fee)
       const gasUsed = Number(confirmedTx.gas_used ?? '0');
       const gasPrice = Number(confirmedTx.gas_unit_price ?? '100');
