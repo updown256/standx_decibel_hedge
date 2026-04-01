@@ -12,6 +12,7 @@ import { safeLog } from '../utils/security';
 const FILL_CHECK_INTERVAL_MS = 2000;
 const FILL_CHECK_MAX_RETRIES = 15; // 30 seconds max
 const CLOSE_RETRY_MAX = 3;
+const FILL_SLIPPAGE_BPS = 20; // 0.2% – ensures IOC taker fill despite order latency
 
 interface HedgeState {
   running: boolean;
@@ -145,8 +146,8 @@ export class Hedger {
     const longClient = this.getClient(this.state.longExchange);
     const shortClient = this.getClient(this.state.shortExchange);
 
-    const longBuyPrice = Math.round(longBuyPriceNum).toString();
-    const shortSellPrice = Math.round(shortSellPriceNum).toString();
+    const longBuyPrice = Math.round(longBuyPriceNum * (1 + FILL_SLIPPAGE_BPS / 10000)).toString();
+    const shortSellPrice = Math.round(shortSellPriceNum * (1 - FILL_SLIPPAGE_BPS / 10000)).toString();
 
     safeLog.info(`[Open] ${this.state.longExchange} BUY @ $${longBuyPrice} | ${this.state.shortExchange} SELL @ $${shortSellPrice}`);
 
@@ -283,8 +284,8 @@ export class Hedger {
 
         if (!longClosed) {
           const longClosePrice = this.state.longExchange === 'standx'
-            ? Math.round(parseFloat(closePriceStandx.bid)).toString()
-            : Math.round(parseFloat(closePriceDecibel.bid)).toString();
+            ? Math.round(parseFloat(closePriceStandx.bid) * (1 - FILL_SLIPPAGE_BPS / 10000)).toString()
+            : Math.round(parseFloat(closePriceDecibel.bid) * (1 - FILL_SLIPPAGE_BPS / 10000)).toString();
 
           closePromises.push(
             longClient.placeOrder({
@@ -315,8 +316,8 @@ export class Hedger {
 
         if (!shortClosed) {
           const shortClosePrice = this.state.shortExchange === 'standx'
-            ? Math.round(parseFloat(closePriceStandx.ask)).toString()
-            : Math.round(parseFloat(closePriceDecibel.ask)).toString();
+            ? Math.round(parseFloat(closePriceStandx.ask) * (1 + FILL_SLIPPAGE_BPS / 10000)).toString()
+            : Math.round(parseFloat(closePriceDecibel.ask) * (1 + FILL_SLIPPAGE_BPS / 10000)).toString();
 
           closePromises.push(
             shortClient.placeOrder({
@@ -431,8 +432,8 @@ export class Hedger {
     try {
       const price = await client.getPrice(this.config.symbol);
       const closePrice = side === 'sell'
-        ? Math.round(parseFloat(price.bid)).toString()
-        : Math.round(parseFloat(price.ask)).toString();
+        ? Math.round(parseFloat(price.bid) * (1 - FILL_SLIPPAGE_BPS / 10000)).toString()
+        : Math.round(parseFloat(price.ask) * (1 + FILL_SLIPPAGE_BPS / 10000)).toString();
 
       await client.placeOrder({
         symbol: this.config.symbol,
