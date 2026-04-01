@@ -199,8 +199,9 @@ export class DecibelClient implements ExchangeClient {
       throw new Error(`[Decibel] Invalid price for ${marketName}: mark=${markPx}, mid=${midPx}, oracle=${oraclePx}`);
     }
 
-    // bid/ask 없으므로 mid 기준 ±0.01% 스프레드 추정
-    const spread = price * 0.0001;
+    // 온체인 DEX — 실제 오더북 스프레드가 넓음. 3% 추정으로 GTC 체결 보장
+    // (실제 체결은 best bid/ask에서 되므로 3%는 최악 시나리오 가격)
+    const spread = price * 0.03;
     const bid = (price - spread).toFixed(2);
     const ask = (price + spread).toFixed(2);
     const mid = price.toFixed(2);
