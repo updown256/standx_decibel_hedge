@@ -36,9 +36,10 @@ const DECIBEL_MODULE = '0x50ead22afd6ffd9769e3b3d6e0e64a2a350d68e8b102c4e72e33d0
 const SCALE = 10 ** 9;
 
 // Time-in-force (Move u8 enum — Decibel specific)
-// const TIF_GTC = 0;        // Good-til-cancel — stays in book until matched or cancelled
-// const TIF_POST_ONLY = 1;  // Post-only (maker) — rejected if would match
-const TIF_IOC = 2;           // Immediate-or-cancel — used with extreme price = market order
+// TIF constants (for place_order — not used with place_market_order)
+// const TIF_GTC = 0;        // Good-til-cancel
+// const TIF_POST_ONLY = 1;  // Post-only (maker)
+// const TIF_IOC = 2;        // Immediate-or-cancel
 
 // Symbol mapping: internal symbol -> Decibel market name
 const SYMBOL_MAP: Record<string, string> = {
@@ -291,31 +292,21 @@ export class DecibelClient implements ExchangeClient {
     const reduceOnly = params.reduceOnly ?? false;
     const clientOrderId = makeClientOrderId();
 
-    // Market order mode: IOC + extreme price → fills at best available price
-    // SELL: price=1 (accept any buyer) | BUY: price=2x passed price (accept any seller)
-    const marketPrice = isBuy
-      ? Math.round(parseFloat(params.price) * 2).toString()
-      : '1';
-    const priceU64 = toU64(marketPrice);
-
-    safeLog.info(`[Decibel] Placing ${params.side} ${params.size} ${marketName} @ market (limit=${marketPrice}) | reduce_only=${reduceOnly} | coid=${clientOrderId}`);
+    safeLog.info(`[Decibel] Placing ${params.side} ${params.size} ${marketName} @ MARKET | reduce_only=${reduceOnly} | coid=${clientOrderId}`);
 
     try {
-      // ABI: dex_accounts_entry::place_order_to_subaccount
-      // Market order = IOC + extreme price → immediate fill at best bid/ask
+      // ABI: dex_accounts_entry::place_market_order_to_subaccount
+      // 시장가 전용 함수 — price/TIF 파라미터 없음, best available에서 즉시 체결
       const txData: InputEntryFunctionData = {
-        function: `${this.moduleAddress}::dex_accounts_entry::place_order_to_subaccount`,
+        function: `${this.moduleAddress}::dex_accounts_entry::place_market_order_to_subaccount`,
         typeArguments: [],
         functionArguments: [
           this.subaccountAddress,   // Object<Subaccount>
           marketAddress,            // Object<PerpMarket>
-          priceU64,                 // u64 price (extreme = market order)
           sizeU64,                  // u64 size (9 decimals)
           isBuy,                    // bool
-          TIF_IOC,                  // u8 time_in_force (2 = IOC, with extreme price = market)
           reduceOnly,               // bool
           clientOrderId,            // Option<String> client_order_id
-          null,                     // Option<u64> stop_price
           null,                     // Option<u64> tp_trigger_price
           null,                     // Option<u64> tp_limit_price
           null,                     // Option<u64> sl_trigger_price
