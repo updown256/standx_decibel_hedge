@@ -360,16 +360,20 @@ export class DecibelClient implements ExchangeClient {
         safeLog.info(`[Decibel] all event types: ${JSON.stringify(allTypes).slice(0, 500)}`);
       }
 
+      // Extract on-chain order_id from events (needed for cancelOrder)
+      const orderEvent = relevantEvents.find((e: any) => e.data?.order_id);
+      const onChainOrderId = orderEvent?.data?.order_id ?? txHash;
+
       // Estimate fee (gas in APT, not trading fee)
       const gasUsed = Number(confirmedTx.gas_used ?? '0');
       const gasPrice = Number(confirmedTx.gas_unit_price ?? '100');
       const gasFeeApt = (gasUsed * gasPrice) / 1e8;
 
-      safeLog.info(`[Decibel] Order submitted | tx=${txHash} | gas=${gasFeeApt.toFixed(6)} APT`);
+      safeLog.info(`[Decibel] Order submitted | tx=${txHash} | orderId=${String(onChainOrderId).slice(0, 20)}... | gas=${gasFeeApt.toFixed(6)} APT`);
 
       return {
         success: true,
-        orderId: txHash,
+        orderId: String(onChainOrderId),
         price: params.price,
         size: params.size,
         fee: gasFeeApt.toFixed(8),

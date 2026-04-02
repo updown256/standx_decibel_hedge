@@ -151,8 +151,8 @@ export class Hedger {
 
     safeLog.info(`[Open] ${this.state.longExchange} BUY @ $${longBuyPrice} | ${this.state.shortExchange} SELL @ $${shortSellPrice}`);
 
-    // Place both orders concurrently
-    const [longResult, shortResult] = await Promise.all([
+    // Place both orders concurrently (allSettled: one throw doesn't orphan the other)
+    const settled = await Promise.allSettled([
       longClient.placeOrder({
         symbol: this.config.symbol,
         side: 'buy',
@@ -166,6 +166,13 @@ export class Hedger {
         price: shortSellPrice,
       }),
     ]);
+
+    const longResult = settled[0].status === 'fulfilled'
+      ? settled[0].value
+      : { success: false, orderId: '', price: longBuyPrice, size: this.config.orderSize, fee: '0', error: (settled[0] as PromiseRejectedResult).reason?.message ?? 'threw' };
+    const shortResult = settled[1].status === 'fulfilled'
+      ? settled[1].value
+      : { success: false, orderId: '', price: shortSellPrice, size: this.config.orderSize, fee: '0', error: (settled[1] as PromiseRejectedResult).reason?.message ?? 'threw' };
 
     // Handle submission failures
     if (!longResult.success && !shortResult.success) {
@@ -280,73 +287,72 @@ export class Hedger {
           this.decibel.getPrice(this.config.symbol),
         ]);
 
-        const closePromises: Promise<void>[] = [];
-
+        // Close each side independently (one throw doesn't block the other)
         if (!longClosed) {
-          const longClosePrice = this.state.longExchange === 'standx'
-            ? Math.round(parseFloat(closePriceStandx.bid) * (1 - FILL_SLIPPAGE_BPS / 10000)).toString()
-            : Math.round(parseFloat(closePriceDecibel.bid) * (1 - FILL_SLIPPAGE_BPS / 10000)).toString();
+          try {
+            const longClosePrice = this.state.longExchange === 'standx'
+              ? Math.round(parseFloat(closePriceStandx.bid) * (1 - FILL_SLIPPAGE_BPS / 10000)).toString()
+              : Math.round(parseFloat(closePriceDecibel.bid) * (1 - FILL_SLIPPAGE_BPS / 10000)).toString();
 
-          closePromises.push(
-            longClient.placeOrder({
+            const res = await longClient.placeOrder({
               symbol: this.config.symbol,
               side: 'sell',
               size: this.config.orderSize,
               price: longClosePrice,
               reduceOnly: true,
-            }).then((res) => {
-              if (res.success) {
-                this.tracker.recordTrade({
-                  timestamp: Date.now(),
-                  exchange: this.state.longExchange,
-                  action: 'close',
-                  side: 'long',
-                  size: this.config.orderSize,
-                  price: longClosePrice,
-                  fee: res.fee,
-                  orderId: res.orderId,
-                });
-                longClosed = true;
-              } else {
-                safeLog.warn(`[Close] Long close attempt ${attempt} failed: ${res.error}`);
-              }
-            })
-          );
+            });
+            if (res.success) {
+              this.tracker.recordTrade({
+                timestamp: Date.now(),
+                exchange: this.state.longExchange,
+                action: 'close',
+                side: 'long',
+                size: this.config.orderSize,
+                price: longClosePrice,
+                fee: res.fee,
+                orderId: res.orderId,
+              });
+              longClosed = true;
+            } else {
+              safeLog.warn(`[Close] Long close attempt ${attempt} failed: ${res.error}`);
+            }
+          } catch (err: any) {
+            safeLog.error(`[Close] Long close attempt ${attempt} threw: ${err?.message}`);
+          }
         }
 
         if (!shortClosed) {
-          const shortClosePrice = this.state.shortExchange === 'standx'
-            ? Math.round(parseFloat(closePriceStandx.ask) * (1 + FILL_SLIPPAGE_BPS / 10000)).toString()
-            : Math.round(parseFloat(closePriceDecibel.ask) * (1 + FILL_SLIPPAGE_BPS / 10000)).toString();
+          try {
+            const shortClosePrice = this.state.shortExchange === 'standx'
+              ? Math.round(parseFloat(closePriceStandx.ask) * (1 + FILL_SLIPPAGE_BPS / 10000)).toString()
+              : Math.round(parseFloat(closePriceDecibel.ask) * (1 + FILL_SLIPPAGE_BPS / 10000)).toString();
 
-          closePromises.push(
-            shortClient.placeOrder({
+            const res = await shortClient.placeOrder({
               symbol: this.config.symbol,
               side: 'buy',
               size: this.config.orderSize,
               price: shortClosePrice,
               reduceOnly: true,
-            }).then((res) => {
-              if (res.success) {
-                this.tracker.recordTrade({
-                  timestamp: Date.now(),
-                  exchange: this.state.shortExchange,
-                  action: 'close',
-                  side: 'short',
-                  size: this.config.orderSize,
-                  price: shortClosePrice,
-                  fee: res.fee,
-                  orderId: res.orderId,
-                });
-                shortClosed = true;
-              } else {
-                safeLog.warn(`[Close] Short close attempt ${attempt} failed: ${res.error}`);
-              }
-            })
-          );
+            });
+            if (res.success) {
+              this.tracker.recordTrade({
+                timestamp: Date.now(),
+                exchange: this.state.shortExchange,
+                action: 'close',
+                side: 'short',
+                size: this.config.orderSize,
+                price: shortClosePrice,
+                fee: res.fee,
+                orderId: res.orderId,
+              });
+              shortClosed = true;
+            } else {
+              safeLog.warn(`[Close] Short close attempt ${attempt} failed: ${res.error}`);
+            }
+          } catch (err: any) {
+            safeLog.error(`[Close] Short close attempt ${attempt} threw: ${err?.message}`);
+          }
         }
-
-        await Promise.all(closePromises);
 
         if (!longClosed || !shortClosed) {
           safeLog.info(`[Close] Retry ${attempt}/${CLOSE_RETRY_MAX}...`);
@@ -435,14 +441,18 @@ export class Hedger {
         ? Math.round(parseFloat(price.bid) * (1 - FILL_SLIPPAGE_BPS / 10000)).toString()
         : Math.round(parseFloat(price.ask) * (1 + FILL_SLIPPAGE_BPS / 10000)).toString();
 
-      await client.placeOrder({
+      const res = await client.placeOrder({
         symbol: this.config.symbol,
         side,
         size: this.config.orderSize,
         price: closePrice,
         reduceOnly: true,
       });
-      safeLog.info(`[Emergency] Closed position on ${client.name}`);
+      if (res.success) {
+        safeLog.info(`[Emergency] Closed position on ${client.name}`);
+      } else {
+        safeLog.error(`[Emergency] Close failed on ${client.name}: ${res.error}`);
+      }
     } catch (err: any) {
       safeLog.error(`[Emergency] Failed to close on ${client.name}: ${err?.message}`);
     }
